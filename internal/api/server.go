@@ -16,7 +16,7 @@ func New() *mux.Router {
 
 	// register routes to be used
 	router.HandleFunc("/create", handlers.CreateNewDownloadHandler).Methods(PostMethod)
-	router.HandleFunc("/", handlers.getDownloadsHandler).Methods(GetMethod)
+	router.HandleFunc("/", handlers.GetDownloadsHandler).Methods(GetMethod)
 	router.HandleFunc("/terminate", stopDownloadTaskHandler)
 	return router
 }

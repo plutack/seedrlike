@@ -10,11 +10,18 @@ type GetDownloadsResponse struct {
 	Message   string `json:"message"`
 	Downloads []torrent.Torrent
 }
+type StopDownloadResponse struct {
+	Message string `json:"message"`
+}
 
 func (r DownloadResponse) String() string {
 	return r.Message
 }
 
 func (r GetDownloadsResponse) String() string {
+	return r.Message
+}
+
+func (r StopDownloadResponse) String() string {
 	return r.Message
 }

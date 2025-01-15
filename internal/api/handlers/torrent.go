@@ -30,17 +30,25 @@ func CreateNewDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Magnetic link is required ", http.StatusBadRequest)
 		return
 	}
-	// call start downlaod function here
+	// TODO: call start downlaod function here
 
 	var resp response.DownloadResponse
 
 	sendResponse(w, resp)
 }
 
-func getDownloadsHandler(w http.ResponseWriter, r *http.Request) {
-	// logic to get all files in the server
+func getDownloadsHandler(w http.ResponseWriter, _ *http.Request) {
+	// TODO: logic to get all files in the server
 
 	var resp response.GetDownloadsResponse
+
+	sendResponse(w, resp)
+}
+
+func StopDownloadHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: logic to terminate a running download
+
+	var resp response.StopDownloadResponse
 
 	sendResponse(w, resp)
 }

@@ -7,16 +7,16 @@ import (
 )
 
 const (
-	GetMethod  = "GET"
-	PostMethod = "POST"
+	GetMethod    = "GET"
+	PostMethod   = "POST"
+	DeleteMethod = "DELETE"
 )
 
 func New() *mux.Router {
 	router := mux.NewRouter()
 
 	// register routes to be used
-	router.HandleFunc("/create", handlers.CreateNewDownloadHandler).Methods(PostMethod)
-	router.HandleFunc("/", handlers.GetDownloadsHandler).Methods(GetMethod)
-	router.HandleFunc("/terminate", stopDownloadTaskHandler)
+	router.HandleFunc("/downloads", handlers.CreateNewDownloadHandler).Methods(GetMethod, PostMethod)
+	router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
 	return router
 }

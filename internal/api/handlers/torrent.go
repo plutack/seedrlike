@@ -2,18 +2,18 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/plutack/seedrlike/internal/api/response"
+	"github.com/plutack/seedrlike/internal/core/torrent" // TODO: this might be conflicting with the anacrolix/torrent package
 )
 
 type downloadRequest struct {
 	MagnetLink string `json:"magnet_link"`
 }
 
-func sendResponse(w http.ResponseWriter, code int, msg fmt.Stringer) { // consider changing message type to an empty interface
+func sendResponse(w http.ResponseWriter, code int, msg interface{}) { // consider changing message type to an empty interface
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(msg); err != nil {
@@ -32,9 +32,15 @@ func CreateNewDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// TODO: call start downlaod function here
+	fileInfo, err := torrent.CreateDownloadTask(req.MagnetLink)
+	if err != nil {
+		sendResponse(w, http.StatusInternalServerError, err)
+	}
 
-	var resp response.DownloadResponse
-
+	resp := response.DownloadResponse{
+		Message:  "download started",
+		Response: fileInfo,
+	}
 	sendResponse(w, http.StatusOK, resp)
 }
 

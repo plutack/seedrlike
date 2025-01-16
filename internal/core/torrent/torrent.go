@@ -6,10 +6,10 @@ import (
 )
 
 type TorrentFile struct {
-	name   string
-	hash   string
-	size   int64
-	status string
+	Name   string
+	Hash   string
+	Size   int64
+	Status string
 }
 
 const (
@@ -22,25 +22,23 @@ type magnetLink = string
 
 var seedrlikeTorrentClient *torrent.Client
 
-func newFile(name string, hash string, size int64, status string) *TorrentFile {
-	return &TorrentFile{name, hash, size, status}
+func newFile(name string, hash string, size int64, status string) TorrentFile {
+	return
 }
 
-func CreateDownloadTask(mLink magnetLink) (*TorrentFile, error) {
+func CreateDownloadTask(mLink magnetLink) (TorrentFile, error) {
 	var err error
 	if seedrlikeTorrentClient == nil {
 		seedrlikeTorrentClient, err = client.New(nil)
 	}
 	if err != nil {
-		return nil, err
+		return TorrentFile{}, err
 	}
 	torrent, err := seedrlikeTorrentClient.AddMagnet(mLink)
-	var tFile *TorrentFile
 	if err != nil {
-		return nil, err
+		return TorrentFile{}, err
 	}
 	<-torrent.GotInfo()
 	fileInfo := torrent.Info()
-	tFile = newFile(fileInfo.Name, torrent.InfoHash().AsString(), fileInfo.Length, StatusPending)
-	return tFile, nil
+	return TorrentFile{fileInfo.Name, torrent.InfoHash().AsString(), fileInfo.Length, StatusPending}, nil
 }

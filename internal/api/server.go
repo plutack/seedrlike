@@ -17,6 +17,6 @@ func New() *mux.Router {
 
 	// register routes to be used
 	router.HandleFunc("/downloads", handlers.CreateNewDownloadHandler).Methods(GetMethod, PostMethod)
-	router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
+	// router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
 	return router
 }

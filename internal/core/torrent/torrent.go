@@ -1,6 +1,8 @@
 package torrent
 
 import (
+	"fmt"
+
 	"github.com/anacrolix/torrent"
 	"github.com/plutack/seedrlike/internal/core/client"
 )
@@ -22,14 +24,13 @@ type magnetLink = string
 
 var seedrlikeTorrentClient *torrent.Client
 
-func newFile(name string, hash string, size int64, status string) TorrentFile {
-	return
-}
-
 func CreateDownloadTask(mLink magnetLink) (TorrentFile, error) {
 	var err error
+
+	config := torrent.NewDefaultClientConfig()
+	config.DataDir = "/home/plutack/Downloads/seedrlike"
 	if seedrlikeTorrentClient == nil {
-		seedrlikeTorrentClient, err = client.New(nil)
+		seedrlikeTorrentClient, err = client.New(config)
 	}
 	if err != nil {
 		return TorrentFile{}, err
@@ -40,5 +41,7 @@ func CreateDownloadTask(mLink magnetLink) (TorrentFile, error) {
 	}
 	<-torrent.GotInfo()
 	fileInfo := torrent.Info()
+	fmt.Println(fileInfo)
+	torrent.DownloadAll()
 	return TorrentFile{fileInfo.Name, torrent.InfoHash().AsString(), fileInfo.Length, StatusPending}, nil
 }

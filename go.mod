@@ -2,7 +2,10 @@ module github.com/plutack/seedrlike
 
 go 1.23.4
 
-require github.com/anacrolix/torrent v1.58.0
+require (
+	github.com/anacrolix/torrent v1.58.0
+	github.com/gorilla/mux v1.8.1
+)
 
 require (
 	github.com/RoaringBitmap/roaring v1.2.3 // indirect
@@ -37,7 +40,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect

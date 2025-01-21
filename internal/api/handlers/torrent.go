@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	// "github.com/gorilla/mux"
+
 	"github.com/plutack/seedrlike/internal/api/response"
 	"github.com/plutack/seedrlike/internal/core/queue"
 	// TODO: this might be conflicting with the anacrolix/torrent package
@@ -37,8 +38,9 @@ func sendResponse(w http.ResponseWriter, code int, msg interface{}) { // conside
 func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Request) {
 	//FIXME: right now 2nd requests hangs due to channel implementation.
 	// first download needs to complete before 2nd request can be accepted which is not what I wwant
+	var err error
 	var req downloadRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
@@ -47,7 +49,12 @@ func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	d.queue.Add(req.MagnetLink)
+	err = d.queue.Add(req.MagnetLink)
+	if err != nil {
+		sendResponse(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
 	resp := "New downloaded added to queue"
 	sendResponse(w, http.StatusOK, resp)
 }

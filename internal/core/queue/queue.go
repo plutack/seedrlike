@@ -1,8 +1,9 @@
 package queue
 
 import (
-	"fmt"
+	"errors"
 	"log"
+	"time"
 
 	"github.com/anacrolix/torrent"
 )
@@ -15,15 +16,23 @@ type (
 	}
 )
 
+var errorQueueFull = errors.New("Download Queue full")
+
 func New() *DownloadQueue {
 	return &DownloadQueue{
-		tasks: make(chan magnetLink),
+		tasks: make(chan magnetLink, 50), // allow for 50 additions to the queue. anymore will result to a server busy status code client side
 	}
 }
 
-func (q *DownloadQueue) Add(m magnetLink) {
-	q.tasks <- m
-	log.Println("")
+func (q *DownloadQueue) Add(m magnetLink) error {
+	select {
+	case q.tasks <- m:
+		log.Println("Link added successfully")
+		return nil
+	default:
+		log.Println("Download Queue full")
+		return errorQueueFull
+	}
 }
 
 func ProcessTasks(c *torrent.Client, q *DownloadQueue) {
@@ -33,18 +42,19 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue) {
 		t, err := c.AddMagnet(l)
 		if err != nil {
 			log.Println("error adding link to client for download")
+			continue
 		}
 		if _, ok := <-t.GotInfo(); !ok {
-			fileInfo := t.Info()
-			fmt.Println(fileInfo)
 			t.DownloadAll()
-			log.Printf("%s started downloading", t.Name)
+			log.Printf("%s started downloading", t.Info().Name)
 			t.DisallowDataUpload()
-			for !c.WaitAll() {
-
+			// TODO: this should eventually become a websocket to the frontend
+			for {
+				if t.Complete().Bool() {
+					break
+				}
 				completed := t.Stats().BytesRead
-
-				printPercentageCompleted(float64(completed.Int64()), t.Length())
+				printPercentageCompleted(completed.Int64(), t.Length())
 			}
 			log.Printf("File name: %s downloaded completely", t.Name())
 			t.Drop()
@@ -52,6 +62,12 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue) {
 	}
 }
 
-func printPercentageCompleted(c float64, t int64) {
-	log.Printf("%f.2 completed out of %d MB", (c/float64(t))*100, t/1000)
+func printPercentageCompleted(c int64, t int64) {
+	time.Sleep(2 * time.Second)
+	percentage := (float64(c) / float64(t)) * 100
+	if percentage > 100 {
+		percentage = 100
+	}
+	sizeInMB := float64(t) / 1000000.0
+	log.Printf("%.2f%% completed out of %.2f MB", percentage, sizeInMB)
 }

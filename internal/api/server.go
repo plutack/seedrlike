@@ -29,6 +29,8 @@ type Response struct {
 	Status  bool   `json:"status"`
 }
 
+var storagePath = "/home/plutack/Downloads/seedrlike"
+
 func (s *Server) registerRoutes() {
 	// register routes to be used
 	d := handlers.NewDownloadHandler(s.queue)
@@ -54,8 +56,6 @@ func (s *Server) registerRoutes() {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
-
-var storagePath = "/home/plutack/Downloads/seedrlike"
 
 func New() (*Server, error) {
 	config := torrent.NewDefaultClientConfig()

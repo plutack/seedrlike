@@ -9,7 +9,11 @@ import (
 )
 
 func main() {
-	server := api.New()
+	server, err := api.New()
+
+	if err != nil {
+		log.Fatal("Failed to initialize serverl", err)
+	}
 
 	fmt.Println("server starting on port 3000...")
 	log.Fatal(http.ListenAndServe(":3000", server))

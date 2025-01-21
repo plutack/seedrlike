@@ -6,11 +6,24 @@ import (
 
 	// "github.com/gorilla/mux"
 	"github.com/plutack/seedrlike/internal/api/response"
-	"github.com/plutack/seedrlike/internal/core/torrent" // TODO: this might be conflicting with the anacrolix/torrent package
+	"github.com/plutack/seedrlike/internal/core/queue"
+	// TODO: this might be conflicting with the anacrolix/torrent package
 )
+
+var downloadQueue = queue.New()
 
 type downloadRequest struct {
 	MagnetLink string `json:"magnet_link"`
+}
+
+type DownloadHandler struct {
+	queue *queue.DownloadQueue
+}
+
+func NewDownloadHandler(q *queue.DownloadQueue) *DownloadHandler {
+	return &DownloadHandler{
+		queue: q,
+	}
 }
 
 func sendResponse(w http.ResponseWriter, code int, msg interface{}) { // consider changing message type to an empty interface
@@ -21,7 +34,9 @@ func sendResponse(w http.ResponseWriter, code int, msg interface{}) { // conside
 	}
 }
 
-func CreateNewDownloadHandler(w http.ResponseWriter, r *http.Request) {
+func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Request) {
+	//FIXME: right now 2nd requests hangs due to channel implementation.
+	// first download needs to complete before 2nd request can be accepted which is not what I wwant
 	var req downloadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
@@ -31,16 +46,9 @@ func CreateNewDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Magnetic link is required ", http.StatusBadRequest)
 		return
 	}
-	// TODO: call start downlaod function here
-	fileInfo, err := torrent.CreateDownloadTask(req.MagnetLink)
-	if err != nil {
-		sendResponse(w, http.StatusInternalServerError, err)
-	}
 
-	resp := response.DownloadResponse{
-		Message:  "download started",
-		Response: fileInfo,
-	}
+	d.queue.Add(req.MagnetLink)
+	resp := "New downloaded added to queue"
 	sendResponse(w, http.StatusOK, resp)
 }
 

@@ -2,10 +2,13 @@ package queue
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/anacrolix/torrent"
+	"github.com/plutack/go-gofile/api"
+	"github.com/plutack/seedrlike/internal/core/upload"
 )
 
 type (
@@ -16,7 +19,10 @@ type (
 	}
 )
 
-var errorQueueFull = errors.New("Download Queue full")
+var (
+	errorQueueFull = errors.New("Download Queue full")
+	storagePath    = "/home/plutack/Downloads/seedrlike"
+)
 
 func New() *DownloadQueue {
 	return &DownloadQueue{
@@ -35,7 +41,10 @@ func (q *DownloadQueue) Add(m magnetLink) error {
 	}
 }
 
-func ProcessTasks(c *torrent.Client, q *DownloadQueue) {
+func getFolderPath(folderName string) string {
+	return fmt.Sprintf("%s/%s", storagePath, folderName)
+}
+func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string) {
 	for {
 		l := <-q.tasks
 		log.Println("New magnet link marked for download")
@@ -58,7 +67,18 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue) {
 			}
 			log.Printf("File name: %s downloaded completely", t.Name())
 			t.Drop()
+			availableServerInfo, err := u.GetAvailableServers("eu")
+			if err != nil {
+				panic(err)
+			}
+			euServer := availableServerInfo.Data.Servers[0].Name
+			err = upload.SendFolderToServer(getFolderPath(t.Info().Name), u, r, euServer)
+			if err != nil {
+				log.Printf("failed to upload %s to gofile: %s", t.Info().Name, err)
+			}
+			// TODO: delete folder from host system
 		}
+
 	}
 }
 

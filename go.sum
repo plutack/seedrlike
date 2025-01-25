@@ -274,6 +274,12 @@ github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/plutack/go-gofile v1.0.0 h1:EwsiZA9i/NVdV3rItSoS6/VgimDNa4zOxoE8Na8wNZA=
+github.com/plutack/go-gofile v1.0.0/go.mod h1:MOYMDcJXct/4lK3B8tHEeO3h9Ww7H1LP+I+EqTGHz9c=
+github.com/plutack/go-gofile v1.0.1 h1:6uHt/9k5TA8QAlIGrSpUAoKmqfq8DZ4mVXdqEBlw9Qg=
+github.com/plutack/go-gofile v1.0.1/go.mod h1:MOYMDcJXct/4lK3B8tHEeO3h9Ww7H1LP+I+EqTGHz9c=
+github.com/plutack/go-gofile v1.0.2 h1:m/oZGyWx1etYy9kBt5HXiCF2G5bHDcf5C42XSzlUbmU=
+github.com/plutack/go-gofile v1.0.2/go.mod h1:MOYMDcJXct/4lK3B8tHEeO3h9Ww7H1LP+I+EqTGHz9c=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus/client_golang v0.9.1/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXPKyh/dDVn+NZz0KFw=

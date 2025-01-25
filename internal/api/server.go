@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/anacrolix/torrent"
+	"github.com/plutack/go-gofile/api"
 	"github.com/plutack/seedrlike/internal/api/handlers"
 	"github.com/plutack/seedrlike/internal/core/client"
 	"github.com/plutack/seedrlike/internal/core/queue"
@@ -19,9 +20,11 @@ const (
 )
 
 type Server struct {
-	router *mux.Router
-	client *torrent.Client
-	queue  *queue.DownloadQueue
+	router        *mux.Router
+	torrentClient *torrent.Client
+	queue         *queue.DownloadQueue
+	gofileClient  *api.Api
+	rootFolderID  string
 }
 
 type Response struct {
@@ -65,14 +68,26 @@ func New() (*Server, error) {
 		return nil, err
 	}
 
+	u := api.New(nil)
 	q := queue.New()
 
+	userInfo, err := u.GetAccountID()
+	if err != nil {
+		return nil, err
+	}
+	accountInfo, err := u.GetAccountInformation(userInfo.Data.ID)
+	if err != nil {
+		return nil, err
+	}
+	r := accountInfo.Data.RootFolder
 	s := &Server{
-		router: mux.NewRouter(),
-		client: c,
-		queue:  q,
+		router:        mux.NewRouter(),
+		torrentClient: c,
+		queue:         q,
+		gofileClient:  u,
+		rootFolderID:  r,
 	}
 	s.registerRoutes()
-	go queue.ProcessTasks(s.client, s.queue)
+	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID)
 	return s, nil
 }

@@ -1,7 +1,7 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
 
 	"github.com/anacrolix/torrent"
@@ -9,6 +9,7 @@ import (
 	"github.com/plutack/seedrlike/internal/api/handlers"
 	"github.com/plutack/seedrlike/internal/core/client"
 	"github.com/plutack/seedrlike/internal/core/queue"
+	"github.com/plutack/seedrlike/views/home"
 
 	"github.com/gorilla/mux"
 )
@@ -40,16 +41,10 @@ func (s *Server) registerRoutes() {
 
 	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-		response := Response{
-			Message: "Hello, World!",
-			Status:  true,
-		}
-
 		// Set content type header
-		w.Header().Set("Content-Type", "application/json")
-
-		// Encode and send JSON response
-		json.NewEncoder(w).Encode(response)
+		w.Header().Set("Content-Type", "text/html")
+		homeComponent := home.Home()
+		homeComponent.Render(context.Background(), w)
 	}).Methods(GetMethod)
 	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(GetMethod, PostMethod)
 

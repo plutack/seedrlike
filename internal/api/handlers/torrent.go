@@ -11,8 +11,6 @@ import (
 	// TODO: this might be conflicting with the anacrolix/torrent package
 )
 
-var downloadQueue = queue.New()
-
 type downloadRequest struct {
 	MagnetLink string `json:"magnet_link"`
 }

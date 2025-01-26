@@ -5,13 +5,13 @@ import (
 	"net/http"
 
 	"github.com/anacrolix/torrent"
+	"github.com/gorilla/mux"
 	"github.com/plutack/go-gofile/api"
 	"github.com/plutack/seedrlike/internal/api/handlers"
 	"github.com/plutack/seedrlike/internal/core/client"
 	"github.com/plutack/seedrlike/internal/core/queue"
-	"github.com/plutack/seedrlike/views/home"
-
-	"github.com/gorilla/mux"
+	"github.com/plutack/seedrlike/views/assets"
+	"github.com/plutack/seedrlike/views/layouts"
 )
 
 const (
@@ -43,12 +43,15 @@ func (s *Server) registerRoutes() {
 
 		// Set content type header
 		w.Header().Set("Content-Type", "text/html")
-		homeComponent := home.Home()
-		homeComponent.Render(context.Background(), w)
+		layouts.WithBase(nil, "", "A seedr.cc like application", true).Render(context.Background(), w)
 	}).Methods(GetMethod)
 	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(GetMethod, PostMethod)
 
 	// router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
+}
+
+func (s *Server) serveStatic() {
+	s.router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.FS(assets.Assets))))
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -83,6 +86,7 @@ func New() (*Server, error) {
 		rootFolderID:  r,
 	}
 	s.registerRoutes()
+	s.serveStatic()
 	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID)
 	return s, nil
 }

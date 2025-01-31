@@ -56,6 +56,8 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			continue
 		}
 		if _, ok := <-t.GotInfo(); !ok {
+			// check if file exists in database so we don't waste bandwidth
+			// and handle appropiately
 			t.DownloadAll()
 			log.Printf("%s started downloading", t.Info().Name)
 			t.DisallowDataUpload()

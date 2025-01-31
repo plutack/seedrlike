@@ -1,3 +1,4 @@
+// using tailwindextra which has daisyui bundled in it.
 export default {
   // darkMode: "selector",
   content: [

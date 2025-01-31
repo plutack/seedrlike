@@ -74,6 +74,7 @@ func uploadFile(fullFilePath string, parentFolderID string, uploadClient *api.Ap
 
 }
 
+// FIXME: for some reason sub folders are saving parent folder id field as null in database
 func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
 	dirSizes := make(map[string]int64)
 	err := filepath.WalkDir(folderPath, func(path string, d fs.DirEntry, err error) error {

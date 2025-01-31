@@ -2,6 +2,7 @@ package response
 
 import "github.com/plutack/seedrlike/internal/core/torrent"
 
+// NOTE: might need to change the type of Response to what was created by sqlc
 type DownloadResponse struct {
 	Message  string `json:"message"`
 	Response torrent.TorrentFile

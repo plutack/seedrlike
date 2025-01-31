@@ -1,5 +1,6 @@
 package torrent
 
+// NOTE: see downloadResponse
 type TorrentFile struct {
 	Name   string
 	Hash   string
@@ -7,6 +8,8 @@ type TorrentFile struct {
 	Status string
 }
 
+// NOTE:  this is suppose to be for the frontend updates
+// websocket transmission perhaps?
 const (
 	StatusPending   = "pending"
 	StatusStarted   = "started"

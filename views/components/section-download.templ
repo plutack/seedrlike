@@ -1,13 +1,14 @@
 package components
 
 templ Download() {
-	<div class="flex align-center justify-center">
-		<form action="/download" method="post" class="flex gap-2 items-center ">
+	<div class="flex align-center justify-center gap-2">
+		<form method="post" class="flex gap-2 items-center" hx-post="/downloads" hx-target="#download-response" hx-swap="innerHTML">
 			<label class="input input-bordered flex items-center gap-2">
 				<img src="/assets/images/magnet.svg" class="w-6 h-6"/>
-				<input type="text" class="grow" placeholder="Magnet Link"/>
+				<input type="text" name="magnet-link" class="grow" placeholder="Magnet Link"/>
 			</label>
 			<input type="submit" value="Download" class="btn"/>
 		</form>
 	</div>
+	<div id="download-response" class="text-center m-5"></div>
 }

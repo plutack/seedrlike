@@ -20,10 +20,10 @@ tmp_dir = "tmp"
   log = "build-errors.log"
   poll = false
   poll_interval = 0
-  post_cmd = []
-  pre_cmd = ["go generate ./..."]
+  post_cmd = [ "goose down" ]
+  pre_cmd = ["sqlc generate","goose up", "go generate ./..."]
   rerun = false
-  rerun_delay = 500
+  rerun_delay = 1500
   send_interrupt = false
   stop_on_error = false
 
@@ -40,7 +40,7 @@ tmp_dir = "tmp"
   time = false
 
 [misc]
-  clean_on_exit = false
+  clean_on_exit = true
 
 [proxy]
   app_port = 3000

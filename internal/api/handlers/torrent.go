@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	// "github.com/gorilla/mux"
 
 	"github.com/plutack/seedrlike/internal/api/response"
 	"github.com/plutack/seedrlike/internal/core/queue"
+	"github.com/plutack/seedrlike/views/components"
 	// TODO: this might be conflicting with the anacrolix/torrent package
 )
 
@@ -34,27 +36,35 @@ func sendResponse(w http.ResponseWriter, code int, msg interface{}) { // conside
 }
 
 func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Request) {
-	//FIXME: right now 2nd requests hangs due to channel implementation.
-	// first download needs to complete before 2nd request can be accepted which is not what I wwant
 	var err error
-	var req downloadRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+	// var req downloadRequest
+	// if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// 	http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+	// 	return
+	// }
+	// if req.MagnetLink == "" {
+	// 	log.Println("something happened")
+	// 	http.Error(w, "Magnetic link is required ", http.StatusBadRequest)
+	// 	return
+	// }
+	if err := r.ParseForm(); err != nil {
+		log.Println("something happened")
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
 	}
-	if req.MagnetLink == "" {
-		http.Error(w, "Magnetic link is required ", http.StatusBadRequest)
+	magnetLink := r.FormValue("magnet-link")
+	if magnetLink == "" {
+		http.Error(w, "Magnetic link is required", http.StatusBadRequest)
 		return
 	}
 
-	err = d.queue.Add(req.MagnetLink)
+	err = d.queue.Add(magnetLink)
 	if err != nil {
 		sendResponse(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 
-	resp := "New downloaded added to queue"
-	sendResponse(w, http.StatusOK, resp)
+	components.QueueSuccess().Render(r.Context(), w)
 }
 
 func GetDownloadsHandler(w http.ResponseWriter, _ *http.Request) {

@@ -1,17 +1,19 @@
 package api
 
 import (
-	"context"
+	"database/sql"
 	"net/http"
+	"os"
 
 	"github.com/anacrolix/torrent"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/plutack/go-gofile/api"
 	"github.com/plutack/seedrlike/internal/api/handlers"
 	"github.com/plutack/seedrlike/internal/core/client"
 	"github.com/plutack/seedrlike/internal/core/queue"
+	database "github.com/plutack/seedrlike/internal/database/sqlc"
 	"github.com/plutack/seedrlike/views/assets"
-	"github.com/plutack/seedrlike/views/layouts"
 )
 
 const (
@@ -26,6 +28,7 @@ type Server struct {
 	queue         *queue.DownloadQueue
 	gofileClient  *api.Api
 	rootFolderID  string
+	dbQueries     *database.Queries
 }
 
 type Response struct {
@@ -36,16 +39,11 @@ type Response struct {
 var storagePath = "/home/plutack/Downloads/seedrlike"
 
 func (s *Server) registerRoutes() {
-	// register routes to be used
 	d := handlers.NewDownloadHandler(s.queue)
 
-	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-
-		// Set content type header
-		w.Header().Set("Content-Type", "text/html")
-		layouts.WithBase(nil, "", "A seedr.cc like application", true).Render(context.Background(), w)
-	}).Methods(GetMethod)
-	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(GetMethod, PostMethod)
+	s.router.HandleFunc("/", handlers.GetTorrentsFromDBHomepage(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
+	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
+	s.router.HandleFunc("/downloads/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
 
 	// router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
 }
@@ -77,6 +75,11 @@ func New() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	conn, err := sql.Open("mysql", os.Getenv("GOOSE_DBSTRING"))
+	if err != nil {
+		panic(err)
+	}
+	db := database.New(conn)
 	r := accountInfo.Data.RootFolder
 	s := &Server{
 		router:        mux.NewRouter(),
@@ -84,9 +87,10 @@ func New() (*Server, error) {
 		queue:         q,
 		gofileClient:  u,
 		rootFolderID:  r,
+		dbQueries:     db,
 	}
-	s.registerRoutes()
 	s.serveStatic()
-	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID)
+	s.registerRoutes()
+	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID, s.dbQueries)
 	return s, nil
 }

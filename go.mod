@@ -5,11 +5,13 @@ go 1.23.5
 require (
 	github.com/a-h/templ v0.3.819
 	github.com/anacrolix/torrent v1.58.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gorilla/mux v1.8.1
-	github.com/plutack/go-gofile v1.0.2
+	github.com/plutack/go-gofile v1.0.4
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/RoaringBitmap/roaring v1.2.3 // indirect
 	github.com/ajwerner/btree v0.0.0-20211221152037-f427b3e689c0 // indirect
 	github.com/alecthomas/atomic v0.1.0-alpha2 // indirect

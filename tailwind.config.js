@@ -1,5 +1,5 @@
 export default {
-  darkMode: "selector",
+  // darkMode: "selector",
   content: [
     "./views/**/*.{html,templ,go}",
   ],

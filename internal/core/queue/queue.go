@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/anacrolix/torrent"
 	"github.com/plutack/go-gofile/api"
 	"github.com/plutack/seedrlike/internal/core/upload"
+	database "github.com/plutack/seedrlike/internal/database/sqlc"
 )
 
 type (
@@ -44,7 +46,7 @@ func (q *DownloadQueue) Add(m magnetLink) error {
 func getFolderPath(folderName string) string {
 	return fmt.Sprintf("%s/%s", storagePath, folderName)
 }
-func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string) {
+func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db *database.Queries) {
 	for {
 		l := <-q.tasks
 		log.Println("New magnet link marked for download")
@@ -72,11 +74,15 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string) {
 				panic(err)
 			}
 			euServer := availableServerInfo.Data.Servers[0].Name
-			err = upload.SendFolderToServer(getFolderPath(t.Info().Name), u, r, euServer)
+			err = upload.SendFolderToServer(getFolderPath(t.Info().Name), u, r, euServer, t.InfoHash().String(), db)
 			if err != nil {
 				log.Printf("failed to upload %s to gofile: %s", t.Info().Name, err)
 			}
 			// TODO: delete folder from host system
+			err = os.RemoveAll(getFolderPath(t.Info().Name))
+			if err != nil {
+				log.Printf("failed to delete %s  from host: %s", t.Info().Name, err)
+			}
 		}
 
 	}

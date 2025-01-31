@@ -8,7 +8,7 @@ package components
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Download() templ.Component {
+func RootFolderList() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,10 +29,6 @@ func Download() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex align-center justify-center gap-2\"><form method=\"post\" class=\"flex gap-2 items-center\" hx-post=\"/downloads\" hx-target=\"#download-response\" hx-swap=\"innerHTML\"><label class=\"input input-bordered flex items-center gap-2\"><img src=\"/assets/images/magnet.svg\" class=\"w-6 h-6\"> <input type=\"text\" name=\"magnet-link\" class=\"grow\" placeholder=\"Magnet Link\"></label> <input type=\"submit\" value=\"Download\" class=\"btn\"></form></div><div id=\"download-response\" class=\"text-center m-5\"></div>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
 		return nil
 	})
 }

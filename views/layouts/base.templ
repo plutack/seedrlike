@@ -1,83 +1,51 @@
 package layouts
 
-import "github.com/plutack/seedrlike/views/components"
+import (
+	"github.com/plutack/seedrlike/views/components"
+	"github.com/plutack/seedrlike/internal/database/sqlc"
+)
 
 const (
 	defaultTitle = "seedrlike"
 )
 
-templ Base(title, description string) {
+templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderID string) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="en" class="h-full">
 		<head>
-			<title>{ getTitle(title) }</title>
+			<title>Seedrlike</title>
 			<link rel="icon" type="image/png" href="/assets/bird.png" hx-preserve="true"/>
 			<meta charset="UTF-8" hx-preserve="true"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0" hx-preserve="true"/>
-			@descriptionMeta(description)
+			<meta name="description" content="A seedr.cc like application"/>
 			<script src="/assets/js/htmx.min.js" hx-preserve="true"></script>
-			<script src="/assets/js/head.min.js" hx-preserve="true" defer></script>
+			<script src="/assets/js/alpine.min.js" hx-preserve="true"></script>
 			<link href="/assets/css/tailwind.css" rel="stylesheet" hx-preserve="true"/>
 			<script hx-preserve="true">
-				if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-					document.documentElement.classList.add('dark')
-				} else {
-					document.documentElement.classList.remove('dark')
-				}
-
-				function toggleTheme() {
-					let theme = localStorage.theme === 'dark' ? 'light' : 'dark'
-					if (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-						theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'
-					}
-					
-					localStorage.theme = theme
-					document.documentElement.classList.toggle('dark', theme === 'dark')
-				}
-
-				function isServerError(request) {
-					return request.status >= 400
-				}
-
-				function handleServerError(event) {
-					if (isServerError(event.detail.xhr)) {
-						event.detail.shouldSwap = true
-						event.detail.isError = false
-					}
-				}
-			</script>
+                if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark')
+                } else {
+                    document.documentElement.classList.remove('dark')
+                }
+                function toggleTheme() {
+                    let theme = localStorage.theme === 'dark' ? 'light' : 'dark'
+                    if (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'
+                    }
+                    
+                    localStorage.theme = theme
+                    document.documentElement.classList.toggle('dark', theme === 'dark')
+                }
+                console.log("hello")
+            </script>
 		</head>
-		@components.Header()
-		<body class="antialiased min-h-screen flex flex-col" hx-ext="head-support">
-			@components.Download()
-			@components.DownloadList()
+		<body class="min-h-screen flex flex-col antialiased">
+			@components.Header()
+			<main class="flex-grow">
+				@components.Download()
+				@components.DownloadList(returnErr, torrents, rootFolderID)
+			</main>
+			@components.Footer()
 		</body>
 	</html>
-}
-
-templ WithBase(component templ.Component, title, description string, fullPage bool) {
-	if fullPage {
-		@Base(title, description) {
-			@component
-		}
-	} else {
-		<head hx-head="merge">
-			<title>{ getTitle(title) }</title>
-			@descriptionMeta(description)
-		</head>
-		@component
-	}
-}
-
-templ descriptionMeta(description string) {
-	if description != "" {
-		<meta name="description" content={ description }/>
-	}
-}
-
-func getTitle(title string) string {
-	if title == "" {
-		return defaultTitle
-	}
-	return title
 }

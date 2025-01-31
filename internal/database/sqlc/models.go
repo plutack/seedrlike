@@ -8,10 +8,21 @@ import (
 	"database/sql"
 )
 
-type Torrent struct {
-	ID        int32
+type File struct {
+	ID        string
 	Name      string
-	Hash      int64
+	FolderID  string
 	Size      int64
+	Mimetype  string
+	Md5       string
 	DateAdded sql.NullTime
+}
+
+type Folder struct {
+	ID             string
+	Name           string
+	Hash           sql.NullString
+	Size           int64
+	ParentFolderID sql.NullString
+	DateAdded      sql.NullTime
 }

@@ -1,0 +1,12 @@
+package components
+
+// components/download.templ
+templ QueueSuccess() {
+	<p
+		id="queue-success"
+		x-data
+		x-init="setTimeout(() => $el.remove(), 2000)"
+	>
+		✅ Link added to queue
+	</p>
+}

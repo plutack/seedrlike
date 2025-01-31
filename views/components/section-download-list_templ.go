@@ -8,7 +8,15 @@ package components
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func DownloadList() templ.Component {
+import "fmt"
+import "github.com/plutack/seedrlike/internal/database/sqlc"
+
+func formatSize(size int64) string {
+	sizeInMB := float64(size) / 10000000
+	return fmt.Sprintf("%f.2", sizeInMB)
+}
+
+func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, folderID string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +37,71 @@ func DownloadList() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"container mx-auto p-4\"><h1 class=\"text-2xl font-bold mb-4\">Downloads</h1><div class=\"p-4 bg-base-200 rounded-lg shadow-lg\"><div class=\"grid grid-cols-[auto,1fr,100px,120px] gap-4 mb-4 text-lg font-semibold items-center\"><span></span> <span>Name</span> <span class=\"text-right\">Size</span> <span class=\"text-center\">Action</span></div><div class=\"space-y-2\"><!-- Folder item --><div class=\"collapse collapse-plus bg-base-100 rounded-lg\" hx-get=\"/api/folder-contents?path=Documents\" hx-trigger=\"click\" hx-target=\"next .collapse-content\" hx-swap=\"innerHTML\"><input type=\"checkbox\" class=\"peer\"><div class=\"collapse-title text-base-content peer-checked:bg-base-300 p-0\"><div class=\"grid grid-cols-[auto,1fr,100px,120px] gap-4 items-center\"><img src=\"/assets/images/folder-open.svg\" alt=\"Folder icon\" class=\"w-6 h-6\"> <span class=\"truncate\">Documents</span> <span class=\"text-right\">1.2 GB</span> <a href=\"#\" class=\"btn btn-sm btn-outline btn-primary w-full\" hx-post=\"/api/download?path=Documents\" hx-swap=\"none\">Download</a></div></div><div class=\"collapse-content bg-base-200\"><!-- Content will be loaded here by htmx --></div></div><!-- Another folder item --><div class=\"collapse collapse-plus bg-base-100 rounded-lg\" hx-get=\"/api/folder-contents?path=Images\" hx-trigger=\"click\" hx-target=\"next .collapse-content\" hx-swap=\"innerHTML\"><input type=\"checkbox\" class=\"peer\"><div class=\"collapse-title text-base-content peer-checked:bg-base-300 p-0\"><div class=\"grid grid-cols-[auto,1fr,100px,120px] gap-4 items-center\"><img src=\"/assets/images/folder-open.svg\" alt=\"Folder icon\" class=\"w-6 h-6\"> <span class=\"truncate\">Images</span> <span class=\"text-right\">3.5 GB</span> <a href=\"#\" class=\"btn btn-sm btn-outline btn-primary w-full\" hx-post=\"/api/download?path=Images\" hx-swap=\"none\">Download</a></div></div><div class=\"collapse-content bg-base-200\"><!-- Content will be loaded here by htmx --></div></div><!-- File item --><div class=\"bg-base-100 rounded-lg\"><div class=\"grid grid-cols-[auto,1fr,100px,120px] gap-4 items-center p-4\"><img src=\"/assets/images/file-music.svg\" alt=\"File icon\" class=\"w-6 h-6\"> <span class=\"truncate\">music.mp3</span> <span class=\"text-right\">5.7 MB</span> <a href=\"#\" class=\"btn btn-sm btn-outline btn-secondary w-full\" hx-post=\"/api/download?path=music.mp3\" hx-swap=\"none\">Download</a></div></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><input type=\"button\" class=\"btn\" hx-get=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var2 string
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("/downloads/" + folderID)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 13, Col: 68}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" hx-target=\"download-list\" hx-swap=\"outerHTML\"> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if returnErr {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"flex justify-center items-center prose\"><p>cannot fetch item</p></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"container mx-auto p-4\" id=\"download-list\"><h1 class=\"text-2xl font-bold mb-4\">Downloads</h1><div class=\"p-4 bg-base-200 rounded-lg shadow-lg\" id=\"folder-list\"><div class=\"grid grid-cols-[auto,1fr,100px,120px] gap-4 mb-4 text-lg font-semibold items-center\"><span></span> <span>Name</span> <span class=\"text-right\">Size</span> <span class=\"text-center\">Action</span></div><div class=\"space-y-2\" hx-get=\"\"><div class=\"torrent-list\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, torrent := range torrents {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"torrent-item\"><span class=\"name\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var3 string
+				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(torrent.Name)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 32, Col: 42}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</span> <span class=\"size\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var4 string
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(formatSize(torrent.Size))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 33, Col: 54}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</span></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div></div></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

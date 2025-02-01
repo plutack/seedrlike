@@ -25,30 +25,58 @@ func newNullString(s string) sql.NullString {
 }
 
 func createFolder(folderName string, parentFolderID string, uploadClient *api.Api, db *database.Queries, hash string, size int64) (string, error) {
+	// Skip parent folder check if this is a torrent root folder (it will have a hash)
+	if parentFolderID != "" && hash == "" {
+		// Only check parent existence for subfolders (non-root folders)
+		exists, err := db.FolderExists(context.Background(), parentFolderID)
+		if err != nil {
+			return "", fmt.Errorf("failed to check parent folder existence: %w", err)
+		}
+		if !exists {
+			return "", fmt.Errorf("parent folder %s does not exist in database", parentFolderID)
+		}
+	}
+
+	// Create folder in storage service
 	info, err := uploadClient.CreateFolder(parentFolderID, folderName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("API error creating folder: %w", err)
 	}
-	var parentFolderIDValue sql.NullString
-	if info.Data.ParentFolder == parentFolderID {
-		parentFolderIDValue = newNullString("")
-	} else {
-		parentFolderIDValue = newNullString(info.Data.ParentFolder)
+
+	if info.Status != "ok" {
+		return "", fmt.Errorf("API error: %s", info.Status)
+	}
+
+	if info.Data.ID == "" {
+		return "", fmt.Errorf("API returned empty folder ID")
+	}
+
+	// For the database entry:
+	// - If this is a torrent root folder (has a hash), parent ID should be NULL
+	// - Otherwise, use the provided parent ID
+	parentFolderIDValue := sql.NullString{
+		String: parentFolderID,
+		Valid:  parentFolderID != "" && hash == "", // Only valid if not a torrent root folder
 	}
 
 	folderDetails := database.CreateFolderParams{
-		ID:             info.Data.ID,
-		Name:           info.Data.Name,
-		Hash:           newNullString(hash),
+		ID:   info.Data.ID,
+		Name: folderName,
+		Hash: sql.NullString{
+			String: hash,
+			Valid:  hash != "",
+		},
 		Size:           size,
 		ParentFolderID: parentFolderIDValue,
 	}
 
-	log.Printf("Creating folder: %s | Parent: %v | Hash: %s | Size: %d\n",
-		info.Data.Name, info.Data.ParentFolder, hash, size)
+	log.Printf("Creating folder in DB: ID=%s, Name=%s, Parent=%v, Hash=%s, Size=%d\n",
+		info.Data.ID, folderName, parentFolderIDValue, hash, size)
+
 	if err := db.CreateFolder(context.Background(), folderDetails); err != nil {
-		return "", err
+		return "", fmt.Errorf("database error: %w", err)
 	}
+
 	return info.Data.ID, nil
 }
 
@@ -65,6 +93,7 @@ func uploadFile(fullFilePath string, parentFolderID string, uploadClient *api.Ap
 		Size:     info.Data.Size,
 		Mimetype: info.Data.Mimetype,
 		Md5:      info.Data.MD5,
+		Server:   info.Data.Servers[0],
 	}
 	if err := db.CreateFile(context.Background(), fileDetails); err != nil {
 		return err
@@ -76,6 +105,7 @@ func uploadFile(fullFilePath string, parentFolderID string, uploadClient *api.Ap
 
 // FIXME: for some reason sub folders are saving parent folder id field as null in database
 func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
+	// Calculate directory sizes first
 	dirSizes := make(map[string]int64)
 	err := filepath.WalkDir(folderPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -86,7 +116,6 @@ func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID s
 			return fmt.Errorf("failed to get file info: %w", err)
 		}
 		if !d.IsDir() {
-			// Add file size to all parent directories
 			currentPath := filepath.Dir(path)
 			for currentPath >= folderPath {
 				dirSizes[currentPath] += info.Size()
@@ -96,34 +125,63 @@ func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID s
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("error calculating directory sizes: %w", err)
+		return err
 	}
+
+	// Map to store folder IDs
+	folderIDs := make(map[string]string)
+
+	// Create the first folder under the provided root folder ID
+	baseName := filepath.Base(folderPath)
+	dirSize := dirSizes[folderPath]
+	log.Printf("Creating initial folder: %s under parent: %s (Size: %d bytes)\n",
+		baseName, rootFolderID, dirSize)
+
+	initialFolderID, err := createFolder(baseName, rootFolderID, uploadClient, db, hash, dirSize)
+	if err != nil {
+		return fmt.Errorf("failed to create initial folder: %w", err)
+	}
+	folderIDs[folderPath] = initialFolderID
+
+	// Process all subfolders
 	err = filepath.WalkDir(folderPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
-			relativePath, err := filepath.Rel(folderPath, path)
-			if err != nil {
-				return fmt.Errorf("failed to get relative path: %w", err)
-			}
-			dirSize := dirSizes[path]
-			log.Printf("Creating folder: %s (Size: %d bytes)\n", relativePath, dirSize)
 
-			newFolderID, createErr := createFolder(d.Name(), rootFolderID, uploadClient, db, hash, dirSize)
+		// Skip the root directory as we've already created it
+		if path == folderPath {
+			return nil
+		}
+
+		if d.IsDir() {
+			parentPath := filepath.Dir(path)
+			parentID, exists := folderIDs[parentPath]
+			if !exists {
+				return fmt.Errorf("parent folder ID not found for: %s", path)
+			}
+
+			dirSize := dirSizes[path]
+			log.Printf("Creating subfolder: %s under parent: %s (Size: %d bytes)\n",
+				d.Name(), parentID, dirSize)
+
+			newFolderID, createErr := createFolder(d.Name(), parentID, uploadClient, db, "", dirSize)
 			if createErr != nil {
 				return fmt.Errorf("failed to create folder %s: %w", d.Name(), createErr)
 			}
-
-			rootFolderID = newFolderID
-			hash = ""
+			folderIDs[path] = newFolderID
 		} else {
-			log.Printf("Uploading file: %s\n", path)
-			if err := uploadFile(path, rootFolderID, uploadClient, db, server); err != nil {
+			parentPath := filepath.Dir(path)
+			parentID, exists := folderIDs[parentPath]
+			if !exists {
+				return fmt.Errorf("parent folder ID not found for file: %s", path)
+			}
+
+			log.Printf("Uploading file: %s to folder: %s\n", path, parentID)
+			if err := uploadFile(path, parentID, uploadClient, db, server); err != nil {
 				return err
 			}
 		}
-
 		return nil
 	})
 

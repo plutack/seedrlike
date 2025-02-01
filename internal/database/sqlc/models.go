@@ -15,6 +15,7 @@ type File struct {
 	Size      int64
 	Mimetype  string
 	Md5       string
+	Server    string
 	DateAdded sql.NullTime
 }
 

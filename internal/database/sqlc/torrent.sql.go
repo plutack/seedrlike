@@ -17,9 +17,10 @@ INSERT INTO Files (
     Folder_ID,
     Size,
     Mimetype,
-    MD5
+    MD5,
+    Server
 ) VALUES (
-    ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?
 )
 `
 
@@ -30,6 +31,7 @@ type CreateFileParams struct {
 	Size     int64
 	Mimetype string
 	Md5      string
+	Server   string
 }
 
 func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) error {
@@ -40,6 +42,7 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) error {
 		arg.Size,
 		arg.Mimetype,
 		arg.Md5,
+		arg.Server,
 	)
 	return err
 }
@@ -75,8 +78,19 @@ func (q *Queries) CreateFolder(ctx context.Context, arg CreateFolderParams) erro
 	return err
 }
 
+const folderExists = `-- name: FolderExists :one
+SELECT COUNT(*) > 0 FROM Folders WHERE ID = ?
+`
+
+func (q *Queries) FolderExists(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRowContext(ctx, folderExists, id)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getFilesByFolderID = `-- name: GetFilesByFolderID :many
-SELECT id, name, folder_id, size, mimetype, md5, date_added FROM Files
+SELECT id, name, folder_id, size, mimetype, md5, server, date_added FROM Files
 WHERE Folder_ID = ?
 `
 
@@ -96,6 +110,7 @@ func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID string) ([]Fi
 			&i.Size,
 			&i.Mimetype,
 			&i.Md5,
+			&i.Server,
 			&i.DateAdded,
 		); err != nil {
 			return nil, err
@@ -132,21 +147,31 @@ func (q *Queries) GetFolderByID(ctx context.Context, id string) (Folder, error) 
 
 const getFolderContents = `-- name: GetFolderContents :many
 WITH folder_contents AS (
-    SELECT 'folder' AS type, ID, Name, Size, CAST(Date_Added AS CHAR) as Date_Added 
+    SELECT 'folder' AS type, 
+           ID, 
+           Name, 
+           Size, 
+           CAST(Date_Added AS CHAR) as Date_Added,
+           '' as Server
     FROM Folders 
     WHERE CASE 
         WHEN ? IS NOT NULL THEN Parent_Folder_ID = ?
         ELSE Parent_Folder_ID IS NULL
     END
     UNION ALL
-    SELECT 'file' AS type, ID, Name, Size, CAST(Date_Added AS CHAR ) as Date_Added
+    SELECT 'file' AS type,
+           ID,
+           Name,
+           Size,
+           CAST(Date_Added AS CHAR) as Date_Added,
+           Server
     FROM Files 
     WHERE CASE 
         WHEN ? IS NOT NULL THEN Folder_ID = ?
         ELSE FALSE
     END
 )
-SELECT type, id, name, size, date_added FROM folder_contents
+SELECT type, id, name, size, date_added, server FROM folder_contents
 ORDER BY Date_Added
 `
 
@@ -163,6 +188,7 @@ type GetFolderContentsRow struct {
 	Name      string
 	Size      int64
 	DateAdded interface{}
+	Server    string
 }
 
 func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsParams) ([]GetFolderContentsRow, error) {
@@ -185,6 +211,7 @@ func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsPa
 			&i.Name,
 			&i.Size,
 			&i.DateAdded,
+			&i.Server,
 		); err != nil {
 			return nil, err
 		}

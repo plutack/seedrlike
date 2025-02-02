@@ -1,33 +1,28 @@
--- name: getTorrents :many
+-- name: GetTorrents :many
 select * from Folders WHERE Parent_Folder_ID IS NULL order by Date_Added Desc;
 
 -- name: GetFolderContents :many
-WITH folder_contents AS (
+WITH RECURSIVE folder_contents AS (
     SELECT 'folder' AS type, 
            ID, 
            Name, 
            Size, 
-           CAST(Date_Added AS CHAR) as Date_Added,
+           DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
            '' as Server
     FROM Folders 
-    WHERE CASE 
-        WHEN ? IS NOT NULL THEN Parent_Folder_ID = ?
-        ELSE Parent_Folder_ID IS NULL
-    END
+    WHERE (Parent_Folder_ID IS NULL AND ? IS NULL) OR Parent_Folder_ID = ?
     UNION ALL
     SELECT 'file' AS type,
            ID,
            Name,
            Size,
-           CAST(Date_Added AS CHAR) as Date_Added,
+           DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
            Server
     FROM Files 
-    WHERE CASE 
-        WHEN ? IS NOT NULL THEN Folder_ID = ?
-        ELSE FALSE
-    END
+    WHERE Folder_ID = ?
 )
-SELECT * FROM folder_contents
+SELECT type, ID, Name, Size, Date_Added, Server 
+FROM folder_contents
 ORDER BY Date_Added;
 
 -- name: CreateFolder :exec

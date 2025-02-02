@@ -13,14 +13,21 @@ func returnDownloadUrl(server string, contentID string, name string) string {
 }
 
 templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, folderID string) {
-	<div>
-		<input type="button" class="btn" hx-get={ "/downloads" + "?parent_id=" + folderID } hx-target="#download-list" hx-swap="outerHTML"/>
+	<div id="download-list">
+		<input
+			type="button"
+			class="btn"
+			hx-get={ "/downloads/" + folderID }
+			hx-target="#download-list"
+			hx-swap="outerHTML"
+			hx-push-url="true"
+		/>
 		if returnErr {
 			<div class="flex justify-center items-center prose">
 				<p>Cannot fetch item</p>
 			</div>
 		} else {
-			<div class="container mx-auto p-4" id="download-list">
+			<div class="container mx-auto p-4">
 				<h1 class="text-2xl font-bold mb-4">Downloads</h1>
 				<div class="p-4 bg-base-200 rounded-lg shadow-lg" id="folder-list">
 					<div class="grid grid-cols-[auto,1fr,auto,auto] gap-4 mb-4 text-lg font-semibold items-center">
@@ -32,13 +39,21 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 					<div class="space-y-2">
 						<div class="torrent-list">
 							for _, torrent := range torrents {
-								@templ.JSONScript("torrents", torrents)
-								<script defer>
-								console.log("torrent", JSON.parse(document.getElementById("torrents").textContent))
-								</script>
 								<div class="grid grid-cols-[auto,1fr,auto,auto] gap-4 items-center py-2 border-b last:border-b-0">
-									<span>📄</span>
-									<span class="truncate">{ torrent.Name }</span>
+									if torrent.Type == "folder" {
+										<img src="/assets/images/folder-close.svg" alt="folder-icon"/>
+									} else {
+										<img src="/assets/images/file.svg" alt="file-icon"/>
+									}
+									<a
+										href={ templ.SafeURL("/downloads/" + torrent.ID) }
+										hx-get={ "/downloads/" + torrent.ID }
+										hx-target="#download-list"
+										hx-swap="outerHTML"
+										hx-push-url="true"
+									>
+										<span class="truncate">{ torrent.Name }</span>
+									</a>
 									<span class="text-right">{ formatSize(torrent.Size) }</span>
 									<div class="dropdown">
 										<div tabindex="0" role="button" class="btn btn-primary m-1">Actions </div>

@@ -43,7 +43,9 @@ templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderI
 			@components.Header()
 			<main class="flex-grow">
 				@components.Download()
-				@components.DownloadList(returnErr, torrents, rootFolderID)
+				<div id="content-container" hx-boost="true">
+					@components.DownloadList(returnErr, torrents, rootFolderID)
+				</div>
 			</main>
 			@components.Footer()
 		</body>

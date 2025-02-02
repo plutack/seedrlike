@@ -146,39 +146,33 @@ func (q *Queries) GetFolderByID(ctx context.Context, id string) (Folder, error) 
 }
 
 const getFolderContents = `-- name: GetFolderContents :many
-WITH folder_contents AS (
+WITH RECURSIVE folder_contents AS (
     SELECT 'folder' AS type, 
            ID, 
            Name, 
            Size, 
-           CAST(Date_Added AS CHAR) as Date_Added,
+           DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
            '' as Server
     FROM Folders 
-    WHERE CASE 
-        WHEN ? IS NOT NULL THEN Parent_Folder_ID = ?
-        ELSE Parent_Folder_ID IS NULL
-    END
+    WHERE (Parent_Folder_ID IS NULL AND ? IS NULL) OR Parent_Folder_ID = ?
     UNION ALL
     SELECT 'file' AS type,
            ID,
            Name,
            Size,
-           CAST(Date_Added AS CHAR) as Date_Added,
+           DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
            Server
     FROM Files 
-    WHERE CASE 
-        WHEN ? IS NOT NULL THEN Folder_ID = ?
-        ELSE FALSE
-    END
+    WHERE Folder_ID = ?
 )
-SELECT type, id, name, size, date_added, server FROM folder_contents
+SELECT type, ID, Name, Size, Date_Added, Server 
+FROM folder_contents
 ORDER BY Date_Added
 `
 
 type GetFolderContentsParams struct {
 	Column1        interface{}
 	ParentFolderID sql.NullString
-	Column3        interface{}
 	FolderID       string
 }
 
@@ -187,17 +181,12 @@ type GetFolderContentsRow struct {
 	ID        string
 	Name      string
 	Size      int64
-	DateAdded interface{}
+	DateAdded string
 	Server    string
 }
 
 func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsParams) ([]GetFolderContentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, getFolderContents,
-		arg.Column1,
-		arg.ParentFolderID,
-		arg.Column3,
-		arg.FolderID,
-	)
+	rows, err := q.db.QueryContext(ctx, getFolderContents, arg.Column1, arg.ParentFolderID, arg.FolderID)
 	if err != nil {
 		return nil, err
 	}
@@ -226,11 +215,11 @@ func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsPa
 	return items, nil
 }
 
-const getTorrents = `-- name: getTorrents :many
+const getTorrents = `-- name: GetTorrents :many
 select id, name, hash, size, parent_folder_id, date_added from Folders WHERE Parent_Folder_ID IS NULL order by Date_Added Desc
 `
 
-func (q *Queries) getTorrents(ctx context.Context) ([]Folder, error) {
+func (q *Queries) GetTorrents(ctx context.Context) ([]Folder, error) {
 	rows, err := q.db.QueryContext(ctx, getTorrents)
 	if err != nil {
 		return nil, err

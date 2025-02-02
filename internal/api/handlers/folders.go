@@ -14,9 +14,7 @@ import (
 func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		folderID := vars["folderID"]
-		log.Println(rootFolderID)
-		log.Printf("folder id from url: %s", folderID)
+		folderID := vars["ID"]
 
 		var folderParams database.GetFolderContentsParams
 		if folderID == rootFolderID {
@@ -33,16 +31,16 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 				FolderID: folderID,
 			}
 		}
-
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
+
+		log.Printf("calling get torrents with id: %s, rootFolderID: %s\n\n", folderID, rootFolderID)
 		if err != nil {
 			log.Printf("Error fetching folder contents: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			components.DownloadList(false, nil, rootFolderID).Render(r.Context(), w)
+			components.DownloadList(true, nil, rootFolderID).Render(r.Context(), w)
 			return
 		}
 
-		log.Println(torrents)
 		w.WriteHeader(http.StatusOK)
 		components.DownloadList(false, torrents, rootFolderID).Render(r.Context(), w)
 	}
@@ -51,35 +49,29 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 func GetTorrentsFromDBHomepage(queries *database.Queries, rootFolderID string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		folderID := vars["folderID"]
-		log.Printf("folder id from url: %s", folderID)
-		log.Println(rootFolderID)
+		folderID := vars["ID"]
+
 		var folderParams database.GetFolderContentsParams
-		if folderID == rootFolderID {
-			folderParams = database.GetFolderContentsParams{
-				ParentFolderID: sql.NullString{},
-				FolderID:       folderID,
-			}
-		} else {
-			folderParams = database.GetFolderContentsParams{
-				ParentFolderID: sql.NullString{
-					String: folderID,
-					Valid:  true,
-				},
-				FolderID: folderID,
-			}
+		folderParams = database.GetFolderContentsParams{
+			ParentFolderID: sql.NullString{Valid: false},
+			FolderID:       folderID,
 		}
 
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
+		log.Printf("calling get torrents  homepage with id: %s, rootFolderID: %s: torrentsfiles: %+v\n\n", folderID, rootFolderID, torrents)
 		if err != nil {
 			log.Printf("Error fetching folder contents: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			layouts.Base(false, nil, rootFolderID).Render(r.Context(), w)
+			layouts.Base(true, nil, rootFolderID).Render(r.Context(), w)
 			return
 		}
 
-		log.Println(torrents)
-		w.WriteHeader(http.StatusOK)
+		if r.Header.Get("HX-Request") == "true" {
+			components.DownloadList(false, torrents, rootFolderID).Render(r.Context(), w)
+			return
+		}
+
+		// Otherwise render the full page
 		layouts.Base(false, torrents, rootFolderID).Render(r.Context(), w)
 	}
 }

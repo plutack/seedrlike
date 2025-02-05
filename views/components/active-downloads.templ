@@ -1,0 +1,74 @@
+package components
+
+templ ActiveDownloads() {
+	<div class="p-4">
+		<h2 class="text-2xl font-bold mb-6">Active Downloads</h2>
+		<div
+			x-data="{ 
+                torrents: {},
+                removeTorrent(id) {
+                        delete this.torrents[id];
+                }
+            }"
+			x-init="
+                let protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                let ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
+                ws.onmessage = (event) => {
+                    let data = JSON.parse(event.data);
+					if (data.type === 'torrent update'){
+	                    torrents[data.id] = data;
+	                    if (data.status === 'completed') {
+							setTimeout(2000)
+	                        removeTorrent(data.id);
+	                    }
+						return
+					}
+					if(data.type === 'upload refresh'){
+						htmx.trigger('#download-list', 'refresh');
+						return
+					}
+                };
+            "
+			class="space-y-4"
+		>
+			<template x-for="[id, torrent] in Object.entries(torrents)" key="id" x-show="Object.keys(torrents).length === 0">
+				<div class="card bg-base-200 shadow-xl">
+					<div class="card-body p-4">
+						<div class="flex items-center justify-between">
+							<h3 class="card-title text-lg" x-text="torrent.name"></h3>
+							<div
+								class="badge"
+								x-text="torrent.status"
+								x-bind:class="{
+                                    'badge-neutral': torrent.status === 'pending',
+                                    'badge-primary': torrent.status === 'downloading',
+                                    'badge-success': torrent.status === 'completed'
+                                }"
+							></div>
+						</div>
+						<div x-show="torrent.status === 'downloading'" class="mt-4">
+							<div class="flex items-center gap-4">
+								<progress
+									class="progress progress-primary w-full"
+									x-bind:value="torrent.progress"
+									max="100"
+								></progress>
+								<span class="text-sm font-medium" x-text="torrent.progress + '%'"></span>
+							</div>
+							<div class="mt-2 flex justify-between text-sm text-base-content/70">
+								<span x-text="'Speed: ' + (torrent.speed || '0 KB/s')"></span>
+								<span x-text="'ETA: ' + (torrent.eta || 'calculating...')"></span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</template>
+			<div
+				x-show="Object.keys(torrents).length === 0"
+				class="text-center p-8 text-base-content/70"
+			>
+				No active downloads
+			</div>
+		</div>
+	</div>
+}

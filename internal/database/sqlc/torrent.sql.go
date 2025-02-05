@@ -64,7 +64,7 @@ type CreateFolderParams struct {
 	Name           string
 	Hash           sql.NullString
 	Size           int64
-	ParentFolderID sql.NullString
+	ParentFolderID string
 }
 
 func (q *Queries) CreateFolder(ctx context.Context, arg CreateFolderParams) error {
@@ -154,7 +154,8 @@ WITH RECURSIVE folder_contents AS (
            DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
            '' as Server
     FROM Folders 
-    WHERE (Parent_Folder_ID IS NULL AND ? IS NULL) OR Parent_Folder_ID = ?
+    WHERE Parent_Folder_ID = ?
+    AND ID != '00000000-0000-0000-0000-000000000000'
     UNION ALL
     SELECT 'file' AS type,
            ID,
@@ -167,12 +168,11 @@ WITH RECURSIVE folder_contents AS (
 )
 SELECT type, ID, Name, Size, Date_Added, Server 
 FROM folder_contents
-ORDER BY Date_Added
+ORDER BY Date_Added DESC
 `
 
 type GetFolderContentsParams struct {
-	Column1        interface{}
-	ParentFolderID sql.NullString
+	ParentFolderID string
 	FolderID       string
 }
 
@@ -186,7 +186,7 @@ type GetFolderContentsRow struct {
 }
 
 func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsParams) ([]GetFolderContentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, getFolderContents, arg.Column1, arg.ParentFolderID, arg.FolderID)
+	rows, err := q.db.QueryContext(ctx, getFolderContents, arg.ParentFolderID, arg.FolderID)
 	if err != nil {
 		return nil, err
 	}
@@ -201,40 +201,6 @@ func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsPa
 			&i.Size,
 			&i.DateAdded,
 			&i.Server,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTorrents = `-- name: GetTorrents :many
-select id, name, hash, size, parent_folder_id, date_added from Folders WHERE Parent_Folder_ID IS NULL order by Date_Added Desc
-`
-
-func (q *Queries) GetTorrents(ctx context.Context) ([]Folder, error) {
-	rows, err := q.db.QueryContext(ctx, getTorrents)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Folder
-	for rows.Next() {
-		var i Folder
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Hash,
-			&i.Size,
-			&i.ParentFolderID,
-			&i.DateAdded,
 		); err != nil {
 			return nil, err
 		}

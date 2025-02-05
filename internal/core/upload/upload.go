@@ -12,6 +12,8 @@ import (
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
 )
 
+const RootFolderPlaceholder = "00000000-0000-0000-0000-000000000000"
+
 type folderID = string
 
 func newNullString(s string) sql.NullString {
@@ -52,12 +54,7 @@ func createFolder(folderName string, parentFolderID string, uploadClient *api.Ap
 	}
 
 	// For the database entry:
-	// - If this is a torrent root folder (has a hash), parent ID should be NULL
 	// - Otherwise, use the provided parent ID
-	parentFolderIDValue := sql.NullString{
-		String: parentFolderID,
-		Valid:  parentFolderID != "" && hash == "", // Only valid if not a torrent root folder
-	}
 
 	folderDetails := database.CreateFolderParams{
 		ID:   info.Data.ID,
@@ -67,11 +64,11 @@ func createFolder(folderName string, parentFolderID string, uploadClient *api.Ap
 			Valid:  hash != "",
 		},
 		Size:           size,
-		ParentFolderID: parentFolderIDValue,
+		ParentFolderID: RootFolderPlaceholder,
 	}
 
 	log.Printf("Creating folder in DB: ID=%s, Name=%s, Parent=%v, Hash=%s, Size=%d\n",
-		info.Data.ID, folderName, parentFolderIDValue, hash, size)
+		info.Data.ID, folderName, parentFolderID, hash, size)
 
 	if err := db.CreateFolder(context.Background(), folderDetails); err != nil {
 		return "", fmt.Errorf("database error: %w", err)

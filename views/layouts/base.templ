@@ -18,31 +18,18 @@ templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderI
 			<meta charset="UTF-8" hx-preserve="true"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0" hx-preserve="true"/>
 			<meta name="description" content="A seedr.cc like application"/>
-			<script src="/assets/js/htmx.min.js" hx-preserve="true"></script>
-			<script src="/assets/js/alpine.min.js" hx-preserve="true"></script>
+			<script defer src="/assets/js/htmx.min.js" hx-preserve="true"></script>
+			<script defer src="/assets/js/htmx.ext.ws.js" hx-preserve="true"></script>
+			<script defer src="/assets/js/alpine.min.js" hx-preserve="true"></script>
 			<link href="/assets/css/tailwind.css" rel="stylesheet" hx-preserve="true"/>
-			<script hx-preserve="true">
-                if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark')
-                } else {
-                    document.documentElement.classList.remove('dark')
-                }
-                function toggleTheme() {
-                    let theme = localStorage.theme === 'dark' ? 'light' : 'dark'
-                    if (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'
-                    }
-                    
-                    localStorage.theme = theme
-                    document.documentElement.classList.toggle('dark', theme === 'dark')
-                }
-                console.log("hello")
-            </script>
 		</head>
 		<body class="min-h-screen flex flex-col antialiased">
 			@components.Header()
 			<main class="flex-grow">
 				@components.Download()
+				<div id="active-downloads">
+					@components.ActiveDownloads()
+				</div>
 				<div id="content-container" hx-boost="true">
 					@components.DownloadList(returnErr, torrents, rootFolderID)
 				</div>

@@ -12,6 +12,7 @@ type GetDownloadsResponse struct {
 	Message   string `json:"message"`
 	Downloads []torrent.TorrentFile
 }
+
 type StopDownloadTaskResponse struct {
 	Message string `json:"message"`
 }

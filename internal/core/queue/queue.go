@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"time"
 
 	"github.com/anacrolix/torrent"
 	"github.com/plutack/go-gofile/api"
 	"github.com/plutack/seedrlike/internal/core/upload"
+	ws "github.com/plutack/seedrlike/internal/core/websocket"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
 )
 
@@ -46,7 +48,7 @@ func (q *DownloadQueue) Add(m magnetLink) error {
 func getFolderPath(folderName string) string {
 	return fmt.Sprintf("%s/%s", storagePath, folderName)
 }
-func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db *database.Queries) {
+func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db *database.Queries, wm *ws.WebsocketManager) {
 	for {
 		l := <-q.tasks
 		log.Println("New magnet link marked for download")
@@ -55,20 +57,48 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			log.Println("error adding link to client for download")
 			continue
 		}
+
+		// FIX: this location ... updates might not render actually if there is an ungoing download
+		wm.SendProgress(ws.TorrentUpdate{
+			Type:     "torrent update",
+			ID:       t.InfoHash().String(),
+			Name:     "unknown",
+			Status:   "pending",
+			Progress: 0,
+			Speed:    getDownloadSpeed(t),
+			ETA:      calculateETA(t),
+		},
+		)
+
 		if _, ok := <-t.GotInfo(); !ok {
-			// check if file exists in database so we don't waste bandwidth
+			// check if file exists in database so we don't waste bandwidth seems
 			// and handle appropiately
 			t.DownloadAll()
 			log.Printf("%s started downloading", t.Info().Name)
+
 			t.DisallowDataUpload()
-			// TODO: this should eventually become a websocket to the frontend
-			for {
-				if t.Complete().Bool() {
-					break
-				}
+			for !t.Complete().Bool() {
 				completed := t.Stats().BytesRead
-				printPercentageCompleted(completed.Int64(), t.Length())
+				wm.SendProgress(ws.TorrentUpdate{
+					Type:     "torrent update",
+					ID:       t.InfoHash().String(),
+					Name:     t.Info().Name,
+					Status:   "downloading",
+					Progress: returnPercentageCompleted(completed.Int64(), t.Length()),
+					Speed:    getDownloadSpeed(t),
+					ETA:      calculateETA(t),
+				})
+				time.Sleep(2 * time.Second)
 			}
+			wm.SendProgress(ws.TorrentUpdate{
+				Type:     "torrent update",
+				ID:       t.InfoHash().String(),
+				Name:     t.Info().Name,
+				Status:   "completed",
+				Progress: 100,
+				Speed:    getDownloadSpeed(t),
+				ETA:      calculateETA(t),
+			})
 			log.Printf("File name: %s downloaded completely", t.Name())
 			t.Drop()
 			availableServerInfo, err := u.GetAvailableServers("eu")
@@ -81,6 +111,10 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				log.Printf("failed to upload %s to gofile: %s", t.Info().Name, err)
 			}
 			// TODO: delete folder from host system
+			wm.SendProgress(ws.RefreshUpdate{
+				Type:    "upload refresh",
+				Message: "file uploaded on gofile",
+			})
 			err = os.RemoveAll(getFolderPath(t.Info().Name))
 			if err != nil {
 				log.Printf("failed to delete %s  from host: %s", t.Info().Name, err)
@@ -90,12 +124,68 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 	}
 }
 
-func printPercentageCompleted(c int64, t int64) {
-	time.Sleep(2 * time.Second)
+func getDownloadSpeed(t *torrent.Torrent) string {
+	bytesPerSec := t.Stats().BytesReadData
+	return formatSpeed(bytesPerSec.Int64())
+}
+
+// BUG this is not working well
+func calculateETA(t *torrent.Torrent) string {
+	stats := t.Stats()
+	bytesCompleted := t.BytesCompleted()
+	totalBytes := t.Length()
+	speed := stats.BytesReadData.Int64()
+
+	// Handle edge cases
+	if speed == 0 {
+		return "calculating..."
+	}
+	if bytesCompleted >= totalBytes {
+		return "complete"
+	}
+
+	// Calculate remaining time
+	bytesRemaining := totalBytes - bytesCompleted
+	seconds := float64(bytesRemaining) / float64(speed)
+	duration := time.Duration(seconds) * time.Second
+
+	return formatDuration(duration)
+}
+
+// formatSpeed converts bytes per second to human readable format
+func formatSpeed(bytesPerSec int64) string {
+	if bytesPerSec < 1024 {
+		return fmt.Sprintf("%d B/s", bytesPerSec)
+	}
+	value := float64(bytesPerSec) / 1024.0
+	if value < 1024 {
+		return fmt.Sprintf("%.2f KB/s", value)
+	}
+	return fmt.Sprintf("%.2f MB/s", value/1024.0)
+}
+
+// formatDuration formats the ETA in a human readable format
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	} else if d < time.Hour {
+		m := int(d.Minutes())
+		s := int(d.Seconds()) % 60
+		return fmt.Sprintf("%dm %ds", m, s)
+	} else {
+		h := int(d.Hours())
+		m := int(d.Minutes()) % 60
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
+}
+
+func returnPercentageCompleted(c int64, t int64) float64 {
 	percentage := (float64(c) / float64(t)) * 100
 	if percentage > 100 {
 		percentage = 100
 	}
 	sizeInMB := float64(t) / 1000000.0
 	log.Printf("%.2f%% completed out of %.2f MB", percentage, sizeInMB)
+
+	return math.Round(percentage*100) / 100
 }

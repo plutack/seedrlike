@@ -54,7 +54,7 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" hx-target=\"#download-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\"> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" hx-target=\"#download-list\" hx-swap=\"outerHTML\" hx-trigger=\"refresh from:body\"> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -2,12 +2,12 @@
 
 -- +goose StatementBegin
 CREATE TABLE Folders(
-    ID char(36) primary key,
-    Name varchar(1000) NOT NULL,
-    Hash char(40),
+    ID CHAR(36) PRIMARY KEY,
+    Name VARCHAR(1000) NOT NULL,
+    Hash CHAR(40),
     Size BIGINT NOT NULL, 
-    Parent_Folder_ID char(36),
-    Date_Added datetime default current_timestamp,
+    Parent_Folder_ID CHAR(36) NOT NULL,
+    Date_Added datetime DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (Parent_Folder_ID) REFERENCES Folders(ID)
 );
 -- +goose StatementEnd
@@ -25,6 +25,13 @@ CREATE TABLE Files(
     FOREIGN KEY (Folder_ID) REFERENCES Folders(ID)
 ); 
 -- +goose StatementEnd
+
+-- +goose StatementBegin
+INSERT INTO Folders (ID, Name, Hash, Size, Parent_Folder_ID)
+VALUES ('00000000-0000-0000-0000-000000000000', 'Root', NULL, 0, '00000000-0000-0000-0000-000000000000');
+-- +goose StatementEnd
+
+
 
 -- +goose Down
 

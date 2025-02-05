@@ -24,6 +24,6 @@ type Folder struct {
 	Name           string
 	Hash           sql.NullString
 	Size           int64
-	ParentFolderID sql.NullString
+	ParentFolderID string
 	DateAdded      sql.NullTime
 }

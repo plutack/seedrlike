@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/plutack/seedrlike/internal/core/upload"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
 	"github.com/plutack/seedrlike/views/components"
 	"github.com/plutack/seedrlike/views/layouts"
@@ -18,17 +18,15 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 
 		var folderParams database.GetFolderContentsParams
 		if folderID == rootFolderID {
+			rootFolderID = upload.RootFolderPlaceholder
 			folderParams = database.GetFolderContentsParams{
-				ParentFolderID: sql.NullString{},
+				ParentFolderID: rootFolderID,
 				FolderID:       folderID,
 			}
 		} else {
 			folderParams = database.GetFolderContentsParams{
-				ParentFolderID: sql.NullString{
-					String: folderID,
-					Valid:  true,
-				},
-				FolderID: folderID,
+				ParentFolderID: folderID,
+				FolderID:       folderID,
 			}
 		}
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
@@ -48,17 +46,14 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 
 func GetTorrentsFromDBHomepage(queries *database.Queries, rootFolderID string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		folderID := vars["ID"]
 
 		var folderParams database.GetFolderContentsParams
+		rootFolderID = upload.RootFolderPlaceholder
 		folderParams = database.GetFolderContentsParams{
-			ParentFolderID: sql.NullString{Valid: false},
-			FolderID:       folderID,
+			ParentFolderID: rootFolderID,
+			FolderID:       rootFolderID,
 		}
-
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
-		log.Printf("calling get torrents  homepage with id: %s, rootFolderID: %s: torrentsfiles: %+v\n\n", folderID, rootFolderID, torrents)
 		if err != nil {
 			log.Printf("Error fetching folder contents: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)

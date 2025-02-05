@@ -20,7 +20,7 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 			hx-get={ "/downloads/" + folderID }
 			hx-target="#download-list"
 			hx-swap="outerHTML"
-			hx-push-url="true"
+			hx-trigger="refresh from:body"
 		/>
 		if returnErr {
 			<div class="flex justify-center items-center prose">

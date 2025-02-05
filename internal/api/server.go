@@ -12,6 +12,7 @@ import (
 	"github.com/plutack/seedrlike/internal/api/handlers"
 	"github.com/plutack/seedrlike/internal/core/client"
 	"github.com/plutack/seedrlike/internal/core/queue"
+	ws "github.com/plutack/seedrlike/internal/core/websocket"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
 	"github.com/plutack/seedrlike/views/assets"
 )
@@ -23,12 +24,13 @@ const (
 )
 
 type Server struct {
-	router        *mux.Router
-	torrentClient *torrent.Client
-	queue         *queue.DownloadQueue
-	gofileClient  *api.Api
-	rootFolderID  string
-	dbQueries     *database.Queries
+	router           *mux.Router
+	torrentClient    *torrent.Client
+	queue            *queue.DownloadQueue
+	gofileClient     *api.Api
+	rootFolderID     string
+	dbQueries        *database.Queries
+	websocketManager *ws.WebsocketManager
 }
 
 type Response struct {
@@ -44,6 +46,7 @@ func (s *Server) registerRoutes() {
 	s.router.HandleFunc("/", handlers.GetTorrentsFromDBHomepage(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
 	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
 	s.router.HandleFunc("/downloads/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
+	s.router.HandleFunc("/ws", handlers.UpgradeRequest(s.websocketManager))
 
 	// router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
 }
@@ -66,6 +69,7 @@ func New() (*Server, error) {
 
 	u := api.New(nil)
 	q := queue.New()
+	wm := ws.New()
 
 	userInfo, err := u.GetAccountID()
 	if err != nil {
@@ -82,15 +86,17 @@ func New() (*Server, error) {
 	db := database.New(conn)
 	r := accountInfo.Data.RootFolder
 	s := &Server{
-		router:        mux.NewRouter(),
-		torrentClient: c,
-		queue:         q,
-		gofileClient:  u,
-		rootFolderID:  r,
-		dbQueries:     db,
+		router:           mux.NewRouter(),
+		torrentClient:    c,
+		queue:            q,
+		gofileClient:     u,
+		rootFolderID:     r,
+		dbQueries:        db,
+		websocketManager: wm,
 	}
 	s.serveStatic()
 	s.registerRoutes()
-	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID, s.dbQueries)
+	go wm.Run()
+	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID, s.dbQueries, wm)
 	return s, nil
 }

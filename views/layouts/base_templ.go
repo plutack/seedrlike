@@ -38,7 +38,7 @@ func Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderID
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\"><head><title>Seedrlike</title><link rel=\"icon\" type=\"image/png\" href=\"/assets/bird.png\" hx-preserve=\"true\"><meta charset=\"UTF-8\" hx-preserve=\"true\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" hx-preserve=\"true\"><meta name=\"description\" content=\"A seedr.cc like application\"><script src=\"/assets/js/htmx.min.js\" hx-preserve=\"true\"></script><script src=\"/assets/js/alpine.min.js\" hx-preserve=\"true\"></script><link href=\"/assets/css/tailwind.css\" rel=\"stylesheet\" hx-preserve=\"true\"><script hx-preserve=\"true\">\n                if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {\n                    document.documentElement.classList.add('dark')\n                } else {\n                    document.documentElement.classList.remove('dark')\n                }\n                function toggleTheme() {\n                    let theme = localStorage.theme === 'dark' ? 'light' : 'dark'\n                    if (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches) {\n                        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'\n                    }\n                    \n                    localStorage.theme = theme\n                    document.documentElement.classList.toggle('dark', theme === 'dark')\n                }\n                console.log(\"hello\")\n            </script></head><body class=\"min-h-screen flex flex-col antialiased\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\"><head><title>Seedrlike</title><link rel=\"icon\" type=\"image/png\" href=\"/assets/bird.png\" hx-preserve=\"true\"><meta charset=\"UTF-8\" hx-preserve=\"true\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" hx-preserve=\"true\"><meta name=\"description\" content=\"A seedr.cc like application\"><script defer src=\"/assets/js/htmx.min.js\" hx-preserve=\"true\"></script><script defer src=\"/assets/js/htmx.ext.ws.js\" hx-preserve=\"true\"></script><script defer src=\"/assets/js/alpine.min.js\" hx-preserve=\"true\"></script><link href=\"/assets/css/tailwind.css\" rel=\"stylesheet\" hx-preserve=\"true\"></head><body class=\"min-h-screen flex flex-col antialiased\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -54,7 +54,15 @@ func Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderID
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div id=\"content-container\" hx-boost=\"true\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div id=\"active-downloads\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.ActiveDownloads().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div id=\"content-container\" hx-boost=\"true\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -62,7 +70,7 @@ func Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderID
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></main>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></main>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -70,7 +78,7 @@ func Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderID
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

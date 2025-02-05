@@ -5,4 +5,4 @@ RUN go build -o /seedrlike ./cmd/
 FROM scratch
 COPY --from=build /seedrlike /seedrlike
 EXPOSE 3000
-CMD ["/server"]
+CMD ["/seedrlike"]

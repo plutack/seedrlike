@@ -11,24 +11,31 @@ templ ActiveDownloads() {
                 }
             }"
 			x-init="
-                let protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-                let ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
-                ws.onmessage = (event) => {
-                    let data = JSON.parse(event.data);
-                    if (data.type === 'torrent update'){
-                        torrents[data.id] = data;
-                        if (data.status === 'completed') {
-                            setTimeout(2000)
-                            removeTorrent(data.id);
-                        }
-                        return
-                    }
-                    if(data.type === 'upload refresh'){
-                        htmx.trigger('#download-list', 'refresh');
-                        return
-                    }
-                };
-            "
+			    let protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+			    let ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
+    
+			    ws.onmessage = (event) => {
+			        let data = JSON.parse(event.data);
+        
+			        if (data.type === 'torrent update'){
+			            torrents[data.id] = data;
+			            if (data.status === 'completed') {
+			                setTimeout(() => removeTorrent(data.id), 2000);
+			            }
+			            return;
+			        }
+        
+			        if(data.type === 'upload refresh'){
+			            htmx.trigger('#download-list', 'refresh');
+			            return;
+			        }
+			    };
+
+			    ws.onclose = () => {
+			        // Clear torrents when WebSocket closes to prevent stale data
+			        torrents = {};
+			    };
+			"
 			class="space-y-4"
 		>
 			<template x-for="[id, torrent] in Object.entries(torrents)" key="id" x-show="Object.keys(torrents).length === 0">

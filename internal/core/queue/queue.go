@@ -213,7 +213,7 @@ func calculateETA(t *torrent.Torrent) string {
 // formatSpeed converts bytes per second to human readable format
 func formatSpeed(bytesPerSec float64) string {
 	if bytesPerSec < 1024 {
-		return fmt.Sprintf("%d B/s", bytesPerSec)
+		return fmt.Sprintf("%.2f B/s", bytesPerSec)
 	}
 	value := bytesPerSec / 1024
 	if value < 1024 {

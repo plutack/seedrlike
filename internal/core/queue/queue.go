@@ -58,49 +58,72 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			continue
 		}
 
-		// FIX: this location ... updates might not render actually if there is an ungoing download
+		// Initial "pending" update
 		wm.SendProgress(ws.TorrentUpdate{
 			Type:     "torrent update",
 			ID:       t.InfoHash().String(),
 			Name:     "unknown",
 			Status:   "pending",
 			Progress: 0,
-			Speed:    getDownloadSpeed(t),
-			ETA:      calculateETA(t),
-		},
-		)
+			Speed:    "0",
+			ETA:      "calculating...",
+		})
 
 		if _, ok := <-t.GotInfo(); !ok {
-			// check if file exists in database so we don't waste bandwidth seems
-			// and handle appropiately
 			t.DownloadAll()
 			log.Printf("%s started downloading", t.Info().Name)
 
 			t.DisallowDataUpload()
+
+			// Channel to stop Goroutines once complete
+			stopChan := make(chan struct{})
+
+			// Start Goroutine for speed and ETA updates
+			go func() {
+				for {
+					select {
+					case <-stopChan:
+						return
+					default:
+						speed := getDownloadSpeed(t, 2*time.Second)
+						eta := calculateETA(t)
+						wm.SendProgress(ws.TorrentUpdate{
+							Type:     "torrent update",
+							ID:       t.InfoHash().String(),
+							Name:     t.Info().Name,
+							Status:   "downloading",
+							Progress: returnPercentageCompleted(t.BytesCompleted(), t.Length()),
+							Speed:    speed,
+							ETA:      eta,
+						})
+						time.Sleep(2 * time.Second) // Adjust interval as needed
+					}
+				}
+			}()
+
+			// Wait until torrent is complete
 			for !t.Complete().Bool() {
-				completed := t.Stats().BytesRead
-				wm.SendProgress(ws.TorrentUpdate{
-					Type:     "torrent update",
-					ID:       t.InfoHash().String(),
-					Name:     t.Info().Name,
-					Status:   "downloading",
-					Progress: returnPercentageCompleted(completed.Int64(), t.Length()),
-					Speed:    getDownloadSpeed(t),
-					ETA:      calculateETA(t),
-				})
-				time.Sleep(2 * time.Second)
+				time.Sleep(1 * time.Second)
 			}
+
+			// Stop the update Goroutine
+			close(stopChan)
+
+			// Final update
 			wm.SendProgress(ws.TorrentUpdate{
 				Type:     "torrent update",
 				ID:       t.InfoHash().String(),
 				Name:     t.Info().Name,
 				Status:   "completed",
 				Progress: 100,
-				Speed:    getDownloadSpeed(t),
-				ETA:      calculateETA(t),
+				Speed:    "0",
+				ETA:      "complete",
 			})
+
 			log.Printf("File name: %s downloaded completely", t.Name())
 			t.Drop()
+
+			// Upload and cleanup
 			availableServerInfo, err := u.GetAvailableServers("eu")
 			if err != nil {
 				panic(err)
@@ -110,34 +133,69 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			if err != nil {
 				log.Printf("failed to upload %s to gofile: %s", t.Info().Name, err)
 			}
-			// TODO: delete folder from host system
+
 			wm.SendProgress(ws.RefreshUpdate{
 				Type:    "upload refresh",
 				Message: "file uploaded on gofile",
 			})
+
 			err = os.RemoveAll(getFolderPath(t.Info().Name))
 			if err != nil {
-				log.Printf("failed to delete %s  from host: %s", t.Info().Name, err)
+				log.Printf("failed to delete %s from host: %s", t.Info().Name, err)
 			}
 		}
-
 	}
 }
 
-func getDownloadSpeed(t *torrent.Torrent) string {
-	bytesPerSec := t.Stats().BytesReadData
-	return formatSpeed(bytesPerSec.Int64())
+func getDownloadSpeed(t *torrent.Torrent, duration time.Duration) string {
+	// Initial stats
+	initialStats := t.Stats()
+	initialBytesRead := initialStats.ConnStats.BytesReadData.Int64()
+
+	// Wait for the specified duration
+	time.Sleep(duration)
+
+	// Final stats
+	finalStats := t.Stats()
+	finalBytesRead := finalStats.ConnStats.BytesReadData.Int64()
+
+	// Calculate the difference in bytes read
+	bytesRead := finalBytesRead - initialBytesRead
+
+	// Calculate the download speed in bytes per second
+	speed := float64(bytesRead) / duration.Seconds()
+
+	return formatSpeed(speed)
 }
 
-// BUG this is not working well
 func calculateETA(t *torrent.Torrent) string {
-	stats := t.Stats()
+	// Define a sampling duration
+	const sampleDuration = 2 * time.Second
+
+	// Get the initial stats
+	initialStats := t.Stats()
+	initialBytesRead := initialStats.ConnStats.BytesReadData.Int64()
+
+	// Wait for the sampling duration
+	time.Sleep(sampleDuration)
+
+	// Get the final stats
+	finalStats := t.Stats()
+	finalBytesRead := finalStats.ConnStats.BytesReadData.Int64()
+
+	// Calculate the speed
+	bytesRead := finalBytesRead - initialBytesRead
+	speed := float64(bytesRead) / sampleDuration.Seconds()
+
+	// Get the completed and total bytes
 	bytesCompleted := t.BytesCompleted()
 	totalBytes := t.Length()
-	speed := stats.BytesReadData.Int64()
 
 	// Handle edge cases
-	if speed == 0 {
+	if totalBytes == 0 {
+		return "calculating..."
+	}
+	if speed <= 0 {
 		return "calculating..."
 	}
 	if bytesCompleted >= totalBytes {
@@ -146,18 +204,18 @@ func calculateETA(t *torrent.Torrent) string {
 
 	// Calculate remaining time
 	bytesRemaining := totalBytes - bytesCompleted
-	seconds := float64(bytesRemaining) / float64(speed)
+	seconds := float64(bytesRemaining) / speed
 	duration := time.Duration(seconds) * time.Second
 
 	return formatDuration(duration)
 }
 
 // formatSpeed converts bytes per second to human readable format
-func formatSpeed(bytesPerSec int64) string {
+func formatSpeed(bytesPerSec float64) string {
 	if bytesPerSec < 1024 {
-		return fmt.Sprintf("%d B/s", bytesPerSec)
+		return fmt.Sprintf("%.2f B/s", bytesPerSec)
 	}
-	value := float64(bytesPerSec) / 1024.0
+	value := bytesPerSec / 1024
 	if value < 1024 {
 		return fmt.Sprintf("%.2f KB/s", value)
 	}

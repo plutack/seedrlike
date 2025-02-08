@@ -1,14 +1,38 @@
 package components
 
 templ Download() {
-	<div class="flex align-center justify-center gap-2">
-		<form method="post" class="flex gap-2 items-center" hx-post="/downloads" hx-target="#download-response" hx-swap="innerHTML">
-			<label class="input input-bordered flex items-center gap-2">
-				<img src="/assets/images/magnet.svg" class="w-6 h-6"/>
-				<input type="text" name="magnet-link" class="grow" placeholder="Magnet Link"/>
-			</label>
-			<input type="submit" value="Download" class="btn"/>
-		</form>
+	<div class="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+		<div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+			<form
+				method="post"
+				class="w-full flex flex-col sm:flex-row gap-3 items-center"
+				hx-post="/downloads"
+				hx-target="#download-response"
+				hx-swap="innerHTML"
+			>
+				<label class="input input-bordered flex items-center gap-2 w-full sm:w-auto flex-1 min-w-0">
+					<img
+						src="/assets/images/magnet.svg"
+						class="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0"
+						alt="Magnet icon"
+					/>
+					<input
+						type="text"
+						name="magnet-link"
+						class="grow w-full min-w-0"
+						placeholder="Paste magnet link here..."
+					/>
+				</label>
+				<input
+					type="submit"
+					value="Download"
+					class="btn w-full sm:w-auto"
+				/>
+			</form>
+		</div>
+		<div
+			id="download-response"
+			class="text-center mt-6 mx-auto max-w-2xl"
+		></div>
 	</div>
-	<div id="download-response" class="text-center m-5"></div>
 }

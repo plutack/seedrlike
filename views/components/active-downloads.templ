@@ -1,13 +1,13 @@
 package components
 
 templ ActiveDownloads() {
-	<div class="p-4">
-		<h2 class="text-2xl font-bold mb-6">Active Downloads</h2>
+	<div class="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+		<h2 class="text-2xl sm:text-3xl font-bold mb-6">Active Downloads</h2>
 		<div
 			x-data="{ 
                 torrents: {},
                 removeTorrent(id) {
-                        delete this.torrents[id];
+                    delete this.torrents[id];
                 }
             }"
 			x-init="
@@ -15,29 +15,29 @@ templ ActiveDownloads() {
                 let ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
                 ws.onmessage = (event) => {
                     let data = JSON.parse(event.data);
-					if (data.type === 'torrent update'){
-	                    torrents[data.id] = data;
-	                    if (data.status === 'completed') {
-							setTimeout(2000)
-	                        removeTorrent(data.id);
-	                    }
-						return
-					}
-					if(data.type === 'upload refresh'){
-						htmx.trigger('#download-list', 'refresh');
-						return
-					}
+                    if (data.type === 'torrent update'){
+                        torrents[data.id] = data;
+                        if (data.status === 'completed') {
+                            setTimeout(2000)
+                            removeTorrent(data.id);
+                        }
+                        return
+                    }
+                    if(data.type === 'upload refresh'){
+                        htmx.trigger('#download-list', 'refresh');
+                        return
+                    }
                 };
             "
 			class="space-y-4"
 		>
 			<template x-for="[id, torrent] in Object.entries(torrents)" key="id" x-show="Object.keys(torrents).length === 0">
-				<div class="card bg-base-200 shadow-xl">
-					<div class="card-body p-4">
-						<div class="flex items-center justify-between">
-							<h3 class="card-title text-lg" x-text="torrent.name"></h3>
+				<div class="card bg-base-200 shadow-xl transition-all duration-200 hover:shadow-2xl">
+					<div class="card-body p-4 sm:p-6">
+						<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+							<h3 class="card-title text-base sm:text-lg break-all" x-text="torrent.name"></h3>
 							<div
-								class="badge"
+								class="badge whitespace-nowrap text-sm"
 								x-text="torrent.status"
 								x-bind:class="{
                                     'badge-neutral': torrent.status === 'pending',
@@ -47,17 +47,17 @@ templ ActiveDownloads() {
 							></div>
 						</div>
 						<div x-show="torrent.status === 'downloading'" class="mt-4">
-							<div class="flex items-center gap-4">
+							<div class="flex items-center gap-3 sm:gap-4">
 								<progress
 									class="progress progress-primary w-full"
 									x-bind:value="torrent.progress"
 									max="100"
 								></progress>
-								<span class="text-sm font-medium" x-text="torrent.progress + '%'"></span>
+								<span class="text-sm font-medium min-w-[4rem] text-right" x-text="torrent.progress + '%'"></span>
 							</div>
-							<div class="mt-2 flex justify-between text-sm text-base-content/70">
-								<span x-text="'Speed: ' + (torrent.speed || '0 KB/s')"></span>
-								<span x-text="'ETA: ' + (torrent.eta || 'calculating...')"></span>
+							<div class="mt-3 flex flex-col sm:flex-row justify-between text-sm text-base-content/70">
+								<span class="whitespace-nowrap" x-text="'Speed: ' + (torrent.speed || '0 KB/s')"></span>
+								<span class="whitespace-nowrap" x-text="'ETA: ' + (torrent.eta || 'calculating...')"></span>
 							</div>
 						</div>
 					</div>
@@ -65,7 +65,7 @@ templ ActiveDownloads() {
 			</template>
 			<div
 				x-show="Object.keys(torrents).length === 0"
-				class="text-center p-8 text-base-content/70"
+				class="text-center p-6 sm:p-8 text-base-content/70 bg-base-200/50 rounded-lg"
 			>
 				No active downloads
 			</div>

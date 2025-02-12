@@ -117,7 +117,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				Status:   "completed",
 				Progress: 100,
 				Speed:    "0",
-				ETA:      "complete",
+				ETA:      "done",
 			})
 
 			log.Printf("File name: %s downloaded completely", t.Name())

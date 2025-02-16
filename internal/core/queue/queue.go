@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -79,7 +80,12 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			stopChan := make(chan struct{})
 
 			// Start Goroutine for speed and ETA updates
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+
 			go func() {
+				defer wg.Done()
 				for {
 					select {
 					case <-stopChan:
@@ -108,6 +114,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 
 			// Stop the update Goroutine
 			close(stopChan)
+			wg.Wait()
 
 			// Final update
 			wm.SendProgress(ws.TorrentUpdate{

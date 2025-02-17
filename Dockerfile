@@ -1,4 +1,4 @@
-FROM golang:1.23.5 as build
+FROM golang:1.23.5 AS build
 WORKDIR /app
 COPY . .
 RUN go build -o /seedrlike ./cmd/

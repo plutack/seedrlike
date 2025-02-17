@@ -141,8 +141,9 @@ Run seedrlike using the following command:
 ##  Project Roadmap
 
 - [X] **`Task 1`**: <strike>Fix bug: websocket complete event is not sent sometimes</strike>
-- [ ] **`Task 2`**: Feat:Add test files.
-- [ ] **`Task 3`**: Feat: Keep track of file status during upload stage and send websocket events based on them.
+- [ ] **`Task 2`**: Bug: Fix file display size.
+- [ ] **`Task 3`**: Feat:Add test files.
+- [ ] **`Task 4`**: Feat: Keep track of file status during upload stage and send websocket events based on them.
 
 ---
 

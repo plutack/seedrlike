@@ -1,9 +1,8 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/PKief/vscode-material-icon-theme/ec559a9f6bfd399b82bb44393651661b08aaf7ba/icons/folder-markdown-open.svg" align="center" width="30%">
+    <img src="./views/assets/bird.png" align="center" width="200%" height="200%">
 </p>
 <p align="center"><h1 align="center">SEEDRLIKE</h1></p>
 <p align="center">
-	<em><code>❯ REPLACE-ME</code></em>
 </p>
 <p align="center">
 	<img src="https://img.shields.io/github/license/plutack/seedrlike?style=default&logo=opensourceinitiative&logoColor=white&color=0080ff" alt="license">
@@ -20,18 +19,18 @@
 
 ##  Table of Contents
 
-- [ Overview](#-overview)
-- [ Features](#-features)
-- [ Project Structure](#-project-structure)
-- [ Getting Started](#-getting-started)
-  - [ Prerequisites](#-prerequisites)
-  - [ Installation](#-installation)
-  - [ Usage](#-usage)
-  - [ Live app](#-live-app)
-- [ Project Roadmap](#-project-roadmap)
-- [ Contributing](#-contributing)
-- [ License](#-license)
-- [ Acknowledgments](#-acknowledgments)
+- [ Overview](<README# Overview>)
+- [ Features](<README# Features>)
+- [ Project Structure](<README# Project Structure>)
+- [ Getting Started](<README# Getting Started>)
+  - [ Prerequisites](<README# Prerequisites>)
+  - [ Installation](<README# Installation>)
+  - [ Usage](<README# Usage>)
+  - [ Live app](README#Live-app)
+- [ Project Roadmap](<README# Project Roadmap>)
+- [ Contributing](<README# Contributing>)
+- [ License](<README# License>)
+- [ Acknowledgments](<README# Acknowledgments>)
 
 ---
 

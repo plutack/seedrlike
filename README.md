@@ -27,6 +27,7 @@
   - [ Prerequisites](#-prerequisites)
   - [ Installation](#-installation)
   - [ Usage](#-usage)
+  - [ Live app](#-live-app)
 - [ Project Roadmap](#-project-roadmap)
 - [ Contributing](#-contributing)
 - [ License](#-license)
@@ -130,6 +131,10 @@ Run seedrlike using the following command:
 ```sh
 ❯ docker run -it -p 3000:3000 {image_name}
 ```
+
+### Live-app
+![seedrike preview 1](./seedrlike-1.png)
+![seedrike preview 2](./seedrlike-2.png)
 
 
 

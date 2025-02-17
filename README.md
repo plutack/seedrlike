@@ -17,20 +17,20 @@
 </p>
 <br>
 
-##  Table of Contents
+## Table of Contents
 
-- [ Overview](<README# Overview>)
-- [ Features](<README# Features>)
-- [ Project Structure](<README# Project Structure>)
-- [ Getting Started](<README# Getting Started>)
-  - [ Prerequisites](<README# Prerequisites>)
-  - [ Installation](<README# Installation>)
-  - [ Usage](<README# Usage>)
-  - [ Live app](README#Live-app)
-- [ Project Roadmap](<README# Project Roadmap>)
-- [ Contributing](<README# Contributing>)
-- [ License](<README# License>)
-- [ Acknowledgments](<README# Acknowledgments>)
+- [Overview](#overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Usage](#usage)
+  - [Live app](#live-app)
+- [Project Roadmap](#project-roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
 
 ---
 

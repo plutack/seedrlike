@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/plutack/go-gofile/api"
@@ -74,16 +75,21 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 	return info.Data.ID, nil
 }
 
-func uploadFile(fullFilePath string, parentFolderID string, uploadClient *api.Api, db *database.Queries, server string) error {
+func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string) error {
 	info, err := uploadClient.UploadFile(server, fullFilePath, parentFolderID)
 
 	if err != nil {
 		return err
 	}
+	folderID := info.Data.ParentFolder
+	if folderID == rootFolderID {
+		folderID = RootFolderPlaceholder
+	}
+
 	fileDetails := database.CreateFileParams{
 		ID:       info.Data.ID,
 		Name:     info.Data.Name,
-		FolderID: info.Data.ParentFolder,
+		FolderID: folderID,
 		Size:     info.Data.Size,
 		Mimetype: info.Data.Mimetype,
 		Md5:      info.Data.MD5,
@@ -99,9 +105,20 @@ func uploadFile(fullFilePath string, parentFolderID string, uploadClient *api.Ap
 
 // FIXME: for some reason sub folders are saving parent folder id field as null in database
 func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
+	// if content is a single torrent file
+	info, err := os.Stat(folderPath)
+	if err != nil {
+		return err
+	}
+
+	if !info.IsDir() {
+		// If it's a single file, upload it directly
+		log.Printf("Uploading single file: %s to root folder: %s\n", folderPath, rootFolderID)
+		return uploadFile(folderPath, rootFolderID, rootFolderID, uploadClient, db, server)
+	}
 	// Calculate directory sizes first
 	dirSizes := make(map[string]int64)
-	err := filepath.WalkDir(folderPath, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(folderPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -172,7 +189,7 @@ func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID s
 			}
 
 			log.Printf("Uploading file: %s to folder: %s\n", path, parentID)
-			if err := uploadFile(path, parentID, uploadClient, db, server); err != nil {
+			if err := uploadFile(path, parentID, rootFolderID, uploadClient, db, server); err != nil {
 				return err
 			}
 		}

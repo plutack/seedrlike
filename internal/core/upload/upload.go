@@ -89,7 +89,7 @@ func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string,
 	fileDetails := database.CreateFileParams{
 		ID:       info.Data.ID,
 		Name:     info.Data.Name,
-		FolderID: info.Data.ParentFolder,
+		FolderID: folderID,
 		Size:     info.Data.Size,
 		Mimetype: info.Data.Mimetype,
 		Md5:      info.Data.MD5,

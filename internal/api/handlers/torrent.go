@@ -13,8 +13,9 @@ import (
 	// TODO: this might be conflicting with the anacrolix/torrent package
 )
 
-type downloadRequest struct {
+type DownloadRequest struct {
 	MagnetLink string `json:"magnet_link"`
+	IsZipped   bool   `json:"zipped"`
 }
 
 type DownloadHandler struct {
@@ -53,12 +54,18 @@ func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	magnetLink := r.FormValue("magnet-link")
+	isZipped := r.FormValue("is-zipped") == "on"
 	if magnetLink == "" {
 		http.Error(w, "Magnetic link is required", http.StatusBadRequest)
 		return
 	}
 
-	err = d.queue.Add(magnetLink)
+	payload := queue.DownloadRequest{
+		MagnetLink: magnetLink,
+		IsZipped:   isZipped,
+	}
+
+	err = d.queue.Add(payload)
 	if err != nil {
 		sendResponse(w, http.StatusServiceUnavailable, err.Error())
 		return

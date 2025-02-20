@@ -99,13 +99,13 @@ Install seedrlike using one of the following methods:
 
 3. Install the project dependencies:
 
+install `goose` to initialize the database after setting the enviroment variables in `envrc.example`. This can be set depending on the user. For local development, direnv is recommended. To install, see [goose documentation](https://pressly.github.io/goose/installation/)
 
 **Using `go modules`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
 
 ```sh
 ❯ go build
 ```
-
 
 **Using `docker`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Docker-2CA5E0.svg?style={badge_style}&logo=docker&logoColor=white" />](https://www.docker.com/)
 
@@ -117,6 +117,7 @@ Install seedrlike using one of the following methods:
 
 
 ###  Usage
+Before running the seedrlike binary run `goose up` to initialize the tables in the specified database
 Run seedrlike using the following command:
 **Using `go modules`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
 

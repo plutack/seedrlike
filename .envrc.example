@@ -1,0 +1,4 @@
+GOOSE_DRIVER=mysql # see [goose documentation](https://pressly.github.io/goose/documentation/environment-variables/)
+GOOSE_DBSTRING="mysql:mysql@tcp(127.0.0.1:3306)/seedrlike"
+GOOSE_MIGRATION_DIR=./internal/database/migrations/ # this is constant use to initialize the database tables and recordsj
+gofile_api_key= <xxxxxxxxxxxxxxx> # see gofile.io for api key

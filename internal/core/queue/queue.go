@@ -20,7 +20,12 @@ type (
 	magnetLink = string
 
 	DownloadQueue struct {
-		tasks chan magnetLink
+		tasks chan DownloadRequest
+	}
+
+	DownloadRequest struct {
+		MagnetLink string
+		IsZipped   bool
 	}
 )
 
@@ -31,13 +36,13 @@ var (
 
 func New() *DownloadQueue {
 	return &DownloadQueue{
-		tasks: make(chan magnetLink, 50), // allow for 50 additions to the queue. anymore will result to a server busy status code client side
+		tasks: make(chan DownloadRequest, 50), // allow for 50 additions to the queue. anymore will result to a server busy status code client side
 	}
 }
 
-func (q *DownloadQueue) Add(m magnetLink) error {
+func (q *DownloadQueue) Add(r DownloadRequest) error {
 	select {
-	case q.tasks <- m:
+	case q.tasks <- r:
 		log.Println("Link added successfully")
 		return nil
 	default:
@@ -51,9 +56,10 @@ func getFolderPath(folderName string) string {
 }
 func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db *database.Queries, wm *ws.WebsocketManager) {
 	for {
-		l := <-q.tasks
+		task := <-q.tasks
 		log.Println("New magnet link marked for download")
-		t, err := c.AddMagnet(l)
+		//TODO: need to check if isZipped is checked
+		t, err := c.AddMagnet(task.MagnetLink)
 		if err != nil {
 			log.Println("error adding link to client for download")
 			continue
@@ -136,19 +142,32 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				panic(err)
 			}
 			euServer := availableServerInfo.Data.Servers[0].Name
-			err = upload.SendFolderToServer(getFolderPath(t.Info().Name), u, r, euServer, t.InfoHash().String(), db)
-			if err != nil {
-				log.Printf("failed to upload %s to gofile: %s", t.Info().Name, err)
-			}
+			//TODO check if task is zipped field is true
+			path := getFolderPath(t.Info().Name)
+			var d string
+			if task.IsZipped {
+				d = path + ".zip"
+				if err = upload.ZipFolder(path, d); err != nil {
+					log.Println("error creating zip", err)
 
+				}
+				path = path + ".zip"
+			}
+			err = upload.SendTorrentToServer(path, u, r, euServer, t.InfoHash().String(), db)
+			if err != nil {
+				log.Printf("failed to upload %s to gofile: %s", path, err)
+			}
 			wm.SendProgress(ws.RefreshUpdate{
 				Type:    "upload refresh",
 				Message: "file uploaded on gofile",
 			})
 
-			err = os.RemoveAll(getFolderPath(t.Info().Name))
+			err = os.RemoveAll(path)
+			if task.IsZipped {
+				err = os.RemoveAll(d)
+			}
 			if err != nil {
-				log.Printf("failed to delete %s from host: %s", t.Info().Name, err)
+				log.Printf("failed to delete %s from host: %s", path, err)
 			}
 		}
 	}

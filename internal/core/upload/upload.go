@@ -1,9 +1,11 @@
 package upload
 
 import (
+	"archive/zip"
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -103,8 +105,59 @@ func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string,
 
 }
 
-// FIXME: for some reason sub folders are saving parent folder id field as null in database
-func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
+func ZipFolder(source string, destination string) error {
+
+	zipFile, err := os.Create(destination)
+	if err != nil {
+		return err
+	}
+	defer zipFile.Close()
+
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(filepath.Dir(source), path)
+		if err != nil {
+			return err
+		}
+
+		// Use CreateHeader to enable ZIP64 support for large files
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			return err
+		}
+		header.Name = relPath
+		header.Method = zip.Deflate // Enable compression
+		if info.IsDir() {
+			header.Name += "/"
+		}
+
+		zipEntry, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		_, err = io.Copy(zipEntry, srcFile)
+		return err
+	})
+}
+
+func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
 	// if content is a single torrent file
 	info, err := os.Stat(folderPath)
 	if err != nil {

@@ -98,22 +98,19 @@ func uploadFile(fullFilePath string, parentFolderID string, uploadClient *api.Ap
 
 }
 
-func SendFolderToServer(path string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
-	// Check if path is a directory or file
-	fileInfo, err := os.Stat(path)
+// FIXME: for some reason sub folders are saving parent folder id field as null in database
+func SendFolderToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
+	info, err := os.Stat(folderPath)
 	if err != nil {
-		return fmt.Errorf("failed to get path info: %w", err)
+		return fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	// FIXME: for some reason sub folders are saving parent folder id field as null in database
-	// Handle single file case
-	if !fileInfo.IsDir() {
-		log.Printf("Uploading single file: %s to folder: %s\n", path, rootFolderID)
-		return uploadFile(path, rootFolderID, uploadClient, db, server)
+	if !info.IsDir() {
+		// If it's a single file, upload it directly
+		log.Printf("Uploading single file: %s to root folder: %s\n", folderPath, rootFolderID)
+		return uploadFile(folderPath, rootFolderID, uploadClient, db, server)
 	}
 
-	// Handle directory case
-	folderPath := path
 	// Calculate directory sizes first
 	dirSizes := make(map[string]int64)
 	err = filepath.WalkDir(folderPath, func(path string, d fs.DirEntry, err error) error {
@@ -143,8 +140,7 @@ func SendFolderToServer(path string, uploadClient *api.Api, rootFolderID string,
 	// Create the first folder under the provided root folder ID
 	baseName := filepath.Base(folderPath)
 	dirSize := dirSizes[folderPath]
-	log.Printf("Creating initial folder: %s under parent: %s (Size: %d bytes)\n",
-		baseName, rootFolderID, dirSize)
+	log.Printf("Creating initial folder: %s under parent: %s (Size: %d bytes)\n", baseName, rootFolderID, dirSize)
 	initialFolderID, err := createFolder(baseName, rootFolderID, rootFolderID, uploadClient, db, hash, dirSize)
 	if err != nil {
 		return fmt.Errorf("failed to create initial folder: %w", err)
@@ -167,8 +163,7 @@ func SendFolderToServer(path string, uploadClient *api.Api, rootFolderID string,
 				return fmt.Errorf("parent folder ID not found for: %s", path)
 			}
 			dirSize := dirSizes[path]
-			log.Printf("Creating subfolder: %s under parent: %s (Size: %d bytes)\n",
-				d.Name(), parentID, dirSize)
+			log.Printf("Creating subfolder: %s under parent: %s (Size: %d bytes)\n", d.Name(), parentID, dirSize)
 			newFolderID, createErr := createFolder(d.Name(), rootFolderID, parentID, uploadClient, db, "", dirSize)
 			if createErr != nil {
 				return fmt.Errorf("failed to create folder %s: %w", d.Name(), createErr)

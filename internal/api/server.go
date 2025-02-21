@@ -85,6 +85,8 @@ func New() (*Server, error) {
 	}
 	db := database.New(conn)
 	r := accountInfo.Data.RootFolder
+	// make rootFolder public
+	u.UpdateContent(r, "public", true)
 	s := &Server{
 		router:           mux.NewRouter(),
 		torrentClient:    c,

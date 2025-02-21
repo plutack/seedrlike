@@ -44,6 +44,7 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 
 	// Create folder in storage service
 	info, err := uploadClient.CreateFolder(parentFolderID, folderName)
+	uploadClient.UpdateContent(info.Data.ID, "public", true)
 	if err != nil {
 		return "", fmt.Errorf("API error creating folder: %w", err)
 	}
@@ -101,6 +102,7 @@ func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string,
 		return err
 	}
 
+	uploadClient.UpdateContent(info.Data.ParentFolder, "public", true)
 	return nil
 
 }

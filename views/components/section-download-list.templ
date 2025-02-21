@@ -8,8 +8,12 @@ func formatSize(size int64) string {
 	return fmt.Sprintf("%.2f", sizeInMB)
 }
 
-func returnDownloadUrl(server string, contentID string, name string) string {
+func returnFileDownloadUrl(server string, contentID string, name string) string {
 	return fmt.Sprintf("https://%s.gofile.io/download/web/%s/%s", server, contentID, name)
+}
+
+func returnFolderDownloadUrl(contentID string) string {
+	return fmt.Sprintf("https://gofile.io/d/%s", contentID)
 }
 
 templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, folderID string) {
@@ -87,7 +91,11 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 									<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
 										<li>
 											<a
-												href={ templ.SafeURL(returnDownloadUrl(torrent.Server, torrent.ID, torrent.Name)) }
+												if torrent.Type == "folder" {
+													href={ templ.SafeURL(returnFolderDownloadUrl(torrent.ID)) }
+												} else {
+													href={ templ.SafeURL(returnFileDownloadUrl(torrent.Server, torrent.ID, torrent.Name)) }
+												}
 												target="_blank"
 												class="flex items-center gap-2"
 											>

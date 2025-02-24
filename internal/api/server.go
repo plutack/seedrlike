@@ -47,7 +47,7 @@ func (s *Server) registerRoutes() {
 	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
 	s.router.HandleFunc("/downloads/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
 	s.router.HandleFunc("/ws", handlers.UpgradeRequest(s.websocketManager))
-
+	s.router.HandleFunc("/health", handlers.GetHealth).Methods(GetMethod)
 	// router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
 }
 

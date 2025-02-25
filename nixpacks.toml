@@ -1,2 +1,2 @@
 [start]
-runImage = 'alpine/curl'
+runImage = 'buildpack-deps:jammy-curl'

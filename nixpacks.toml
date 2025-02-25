@@ -1,2 +1,2 @@
-[phases.setup]
-nixPkgs = ["...","curl", "wget"]
+[start]
+cmd = "apt-get update && sudo apt-get install -y --no-install-recommends curl && ./out"

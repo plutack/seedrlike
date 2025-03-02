@@ -12,7 +12,7 @@ func main() {
 	server, err := api.New()
 
 	if err != nil {
-		log.Fatal("Failed to initialize serverl", err)
+		log.Fatal("Failed to initialize server", err)
 	}
 
 	fmt.Println("server starting on port 3000...")

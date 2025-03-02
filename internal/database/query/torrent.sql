@@ -57,3 +57,35 @@ WHERE Folder_ID = ?;
 
 -- name: FolderExists :one
 SELECT COUNT(*) > 0 FROM Folders WHERE ID = ?;
+
+-- name: DeleteOldContent :exec
+DELETE FROM Files 
+WHERE Date_Added < NOW() - INTERVAL 7 DAY;
+
+DELETE FROM Folders
+WHERE Date_Added < NOW() - INTERVAL 7 DAY;
+
+-- name: GetFoldersToDelete :many
+WITH RECURSIVE to_delete AS (
+    SELECT f.ID FROM Folders f WHERE f.ID = ? 
+    UNION ALL
+    SELECT f.ID 
+    FROM Folders f
+    INNER JOIN to_delete td ON f.Parent_Folder_ID = td.ID
+)
+SELECT ID FROM to_delete;
+
+-- name: DeleteFilesByFolderIDs :exec
+DELETE FROM Files WHERE Folder_ID = ?;
+
+-- name: DeleteFolderByID :exec
+DELETE FROM Folders WHERE ID = ?;
+
+-- name: DeleteFileByID :exec
+DELETE FROM Files WHERE ID = ?;
+
+-- name: GetOldFiles :many
+SELECT ID FROM Files WHERE Date_Added < NOW() - INTERVAL 7 DAY;
+
+-- name: GetOldFolders :many
+SELECT ID FROM Folders WHERE Date_Added < NOW() - INTERVAL 7 DAY;

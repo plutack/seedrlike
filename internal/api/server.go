@@ -29,6 +29,7 @@ type Server struct {
 	queue            *queue.DownloadQueue
 	gofileClient     *api.Api
 	rootFolderID     string
+	db               *sql.DB
 	dbQueries        *database.Queries
 	websocketManager *ws.WebsocketManager
 }
@@ -45,10 +46,11 @@ func (s *Server) registerRoutes() {
 
 	s.router.HandleFunc("/", handlers.GetTorrentsFromDBHomepage(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
 	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
+	s.router.HandleFunc("/downloads", handlers.DeleteStaleContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
 	s.router.HandleFunc("/downloads/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
+	s.router.HandleFunc("/downloads/{ID}", handlers.DeleteContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
 	s.router.HandleFunc("/ws", handlers.UpgradeRequest(s.websocketManager))
 	s.router.HandleFunc("/health", handlers.GetHealth).Methods(GetMethod)
-	// router.HandleFunc("/downloads/{torrentID}", handlers.StopDownloadTaskHandler).Methods(DeleteMethod)
 }
 
 func (s *Server) serveStatic() {
@@ -93,6 +95,7 @@ func New() (*Server, error) {
 		queue:            q,
 		gofileClient:     u,
 		rootFolderID:     r,
+		db:               conn,
 		dbQueries:        db,
 		websocketManager: wm,
 	}

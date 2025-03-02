@@ -78,6 +78,43 @@ func (q *Queries) CreateFolder(ctx context.Context, arg CreateFolderParams) erro
 	return err
 }
 
+const deleteFileByID = `-- name: DeleteFileByID :exec
+DELETE FROM Files WHERE ID = ?
+`
+
+func (q *Queries) DeleteFileByID(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteFileByID, id)
+	return err
+}
+
+const deleteFilesByFolderIDs = `-- name: DeleteFilesByFolderIDs :exec
+DELETE FROM Files WHERE Folder_ID = ?
+`
+
+func (q *Queries) DeleteFilesByFolderIDs(ctx context.Context, folderID string) error {
+	_, err := q.db.ExecContext(ctx, deleteFilesByFolderIDs, folderID)
+	return err
+}
+
+const deleteFolderByID = `-- name: DeleteFolderByID :exec
+DELETE FROM Folders WHERE ID = ?
+`
+
+func (q *Queries) DeleteFolderByID(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteFolderByID, id)
+	return err
+}
+
+const deleteOldContent = `-- name: DeleteOldContent :exec
+DELETE FROM Files 
+WHERE Date_Added < NOW() - INTERVAL 7 DAY
+`
+
+func (q *Queries) DeleteOldContent(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteOldContent)
+	return err
+}
+
 const folderExists = `-- name: FolderExists :one
 SELECT COUNT(*) > 0 FROM Folders WHERE ID = ?
 `
@@ -205,6 +242,94 @@ func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsPa
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFoldersToDelete = `-- name: GetFoldersToDelete :many
+WITH RECURSIVE to_delete AS (
+    SELECT f.ID FROM Folders f WHERE f.ID = ? 
+    UNION ALL
+    SELECT f.ID 
+    FROM Folders f
+    INNER JOIN to_delete td ON f.Parent_Folder_ID = td.ID
+)
+SELECT ID FROM to_delete
+`
+
+func (q *Queries) GetFoldersToDelete(ctx context.Context, id string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getFoldersToDelete, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getOldFiles = `-- name: GetOldFiles :many
+SELECT ID FROM Files WHERE Date_Added < NOW() - INTERVAL 7 DAY
+`
+
+func (q *Queries) GetOldFiles(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getOldFiles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getOldFolders = `-- name: GetOldFolders :many
+SELECT ID FROM Folders WHERE Date_Added < NOW() - INTERVAL 7 DAY
+`
+
+func (q *Queries) GetOldFolders(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getOldFolders)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

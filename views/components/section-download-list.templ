@@ -16,23 +16,29 @@ func returnFolderDownloadUrl(contentID string) string {
 	return fmt.Sprintf("https://gofile.io/d/%s", contentID)
 }
 
+func returnContentDeleteUrl(contentID, contentType string) string {
+	return fmt.Sprintf("/downloads/%s?type=%s", contentID, contentType)
+}
+
 templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, folderID string) {
 	<div id="download-list">
-		<input
-			type="button"
-			class="btn hidden"
-			hx-get={ "/downloads/" + folderID }
-			hx-target="#download-list"
-			hx-swap="outerHTML"
-			hx-trigger="refresh from:body"
-		/>
-		if returnErr {
-			<div class="flex justify-center items-center p-8">
-				<p class="text-error text-lg">Cannot fetch item</p>
+		<div class="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+			<div class="flex justify-between items-center mb-6">
+				<h1 class="text-2xl sm:text-3xl font-bold">Downloads</h1>
+				<input
+					type="button"
+					class="btn btn-sm sm:btn-md"
+					hx-delete="/downloads"
+					hx-target="#download-list"
+					hx-swap="outerHTML"
+					value="Delete stale content"
+				/>
 			</div>
-		} else {
-			<div class="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-				<h1 class="text-2xl sm:text-3xl font-bold mb-6">Downloads</h1>
+			if returnErr {
+				<div class="flex justify-center items-center p-8">
+					<p class="text-error text-lg">Cannot fetch item</p>
+				</div>
+			} else {
 				<div class="bg-base-200 rounded-lg shadow-lg" id="folder-list">
 					<div class="hidden sm:grid sm:grid-cols-[auto,1fr,auto,auto] gap-4 p-4 text-base font-semibold items-center border-b border-base-300">
 						<span class="w-6"></span>
@@ -103,7 +109,13 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 											</a>
 										</li>
 										<li>
-											<a class="flex items-center gap-2">
+											<a
+												hx-delete={ returnContentDeleteUrl(torrent.ID, torrent.Type) }
+												hx-target="#download-list"
+												hx-swap="outerHTML"
+												hx-on::htmx:afterRequest="htmx.trigger('#download-list', 'refresh')"
+												class="flex items-center gap-2"
+											>
 												<span>Delete</span>
 											</a>
 										</li>
@@ -113,7 +125,7 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 						}
 					</div>
 				</div>
-			</div>
-		}
+			}
+		</div>
 	</div>
 }

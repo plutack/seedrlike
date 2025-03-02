@@ -8,7 +8,7 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
-	github.com/plutack/go-gofile v1.0.6
+	github.com/plutack/go-gofile v1.0.8
 )
 
 require (

@@ -106,10 +106,12 @@ func (q *Queries) DeleteFolderByID(ctx context.Context, id string) error {
 }
 
 const deleteOldContent = `-- name: DeleteOldContent :exec
+
 DELETE FROM Files 
-WHERE Date_Added < NOW() - INTERVAL 7 DAY
+WHERE Folder_ID IN (SELECT ID FROM Folders WHERE Date_Added < NOW() - INTERVAL 7 DAY)
 `
 
+// Ensure root folder is never included
 func (q *Queries) DeleteOldContent(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, deleteOldContent)
 	return err
@@ -314,7 +316,9 @@ func (q *Queries) GetOldFiles(ctx context.Context) ([]string, error) {
 }
 
 const getOldFolders = `-- name: GetOldFolders :many
-SELECT ID FROM Folders WHERE Date_Added < NOW() - INTERVAL 7 DAY
+SELECT ID FROM Folders 
+WHERE Date_Added < NOW() - INTERVAL 7 DAY
+AND ID != '00000000-0000-0000-0000-000000000000'
 `
 
 func (q *Queries) GetOldFolders(ctx context.Context) ([]string, error) {

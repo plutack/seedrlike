@@ -58,10 +58,6 @@ WHERE Folder_ID = ?;
 -- name: FolderExists :one
 SELECT COUNT(*) > 0 FROM Folders WHERE ID = ?;
 
--- name: DeleteOldContent :exec
-DELETE FROM Files 
-WHERE Date_Added < NOW() - INTERVAL 7 DAY;
-
 DELETE FROM Folders
 WHERE Date_Added < NOW() - INTERVAL 7 DAY;
 
@@ -88,4 +84,17 @@ DELETE FROM Files WHERE ID = ?;
 SELECT ID FROM Files WHERE Date_Added < NOW() - INTERVAL 7 DAY;
 
 -- name: GetOldFolders :many
-SELECT ID FROM Folders WHERE Date_Added < NOW() - INTERVAL 7 DAY;
+SELECT ID FROM Folders 
+WHERE Date_Added < NOW() - INTERVAL 7 DAY
+AND ID != '00000000-0000-0000-0000-000000000000';  -- Ensure root folder is never included
+
+-- name: DeleteOldContent :exec
+DELETE FROM Files 
+WHERE Folder_ID IN (SELECT ID FROM Folders WHERE Date_Added < NOW() - INTERVAL 7 DAY);
+
+DELETE FROM Files 
+WHERE Date_Added < NOW() - INTERVAL 7 DAY;
+
+DELETE FROM Folders
+WHERE Date_Added < NOW() - INTERVAL 7 DAY
+AND ID != '00000000-0000-0000-0000-000000000000';  -- Protect root folder

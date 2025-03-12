@@ -184,7 +184,6 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 				fmt.Printf("Failed to delete stale files from Gofile: %v\n", err)
 			}
 		}
-
 		if len(staleFolders) != 0 {
 			_, err = gofileClient.DeleteContent(staleFolders...)
 			if err != nil {
@@ -192,7 +191,6 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 			}
 		}
 
-		// safer this way
 		// Start a transaction
 		tx, err := db.BeginTx(r.Context(), nil)
 		if err != nil {
@@ -202,11 +200,35 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 		defer tx.Rollback()
 		qtx := queries.WithTx(tx)
 
-		// Delete stale content from DB
-		err = qtx.DeleteOldContent(r.Context())
-		if err != nil {
-			http.Error(w, "Failed to delete stale content", http.StatusInternalServerError)
-			return
+		for _, folderID := range staleFolders {
+			err = qtx.DeleteFilesByFolderIDs(r.Context(), folderID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to delete files in folder %s: %v", folderID, err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		//  delete stale files
+		for _, fileID := range staleFiles {
+			err = qtx.DeleteFileByID(r.Context(), fileID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to delete file %s: %v", fileID, err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		//  delete the folders
+		for _, folderID := range staleFolders {
+			// Skip the root folder placeholder
+			if folderID == upload.RootFolderPlaceholder {
+				continue
+			}
+
+			err = qtx.DeleteFolderByID(r.Context(), folderID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to delete folder %s: %v", folderID, err), http.StatusInternalServerError)
+				return
+			}
 		}
 
 		// Commit the transaction
@@ -214,7 +236,7 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 			return
 		}
-		// this should be a function at this point
+
 		// Fetch updated torrent list
 		rootFolderID := upload.RootFolderPlaceholder
 		folderParams := database.GetFolderContentsParams{

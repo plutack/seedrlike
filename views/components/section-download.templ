@@ -9,6 +9,7 @@ templ Download() {
 				hx-post="/downloads"
 				hx-target="#download-response"
 				hx-swap="innerHTML"
+				hx-on::after-request="if(event.detail.xhr.status === 200) { this.querySelector('input[name=magnet-link]').value = ''; }"
 			>
 				<label class="input input-bordered flex items-center gap-2 w-full sm:w-auto flex-1 min-w-0">
 					<img

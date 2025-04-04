@@ -27,11 +27,14 @@ type (
 		MagnetLink string
 		IsZipped   bool
 	}
+
+	activeTorrents map[*torrent.Torrent]bool
 )
 
 var (
-	errorQueueFull = errors.New("Download Queue full")
-	storagePath    = "/home/plutack/Downloads/seedrlike"
+	errorQueueFull  = errors.New("Download Queue full")
+	storagePath     = "/home/plutack/Downloads/seedrlike"
+	ActiveDownloads activeTorrents
 )
 
 func New() *DownloadQueue {
@@ -58,7 +61,6 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 	for {
 		task := <-q.tasks
 		log.Println("New magnet link marked for download")
-		//TODO: need to check if isZipped is checked
 		t, err := c.AddMagnet(task.MagnetLink)
 		if err != nil {
 			log.Println("error adding link to client for download")
@@ -79,7 +81,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		if _, ok := <-t.GotInfo(); !ok {
 			t.DownloadAll()
 			log.Printf("%s started downloading", t.Info().Name)
-
+			activeDownloads[t] = true
 			t.DisallowDataUpload()
 
 			// Channel to stop Goroutines once complete
@@ -108,7 +110,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 							Speed:    speed,
 							ETA:      eta,
 						})
-						time.Sleep(2 * time.Second) // Adjust interval as needed
+						time.Sleep(2 * time.Second)
 					}
 				}
 			}()
@@ -121,6 +123,8 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			// Stop the update Goroutine
 			close(stopChan)
 			wg.Wait()
+
+			delete(activeDownloads, t)
 
 			// Final update
 			wm.SendProgress(ws.TorrentUpdate{

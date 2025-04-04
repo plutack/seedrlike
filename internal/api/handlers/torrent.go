@@ -5,8 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	// "github.com/gorilla/mux"
-
+	"github.com/gorilla/mux"
 	"github.com/plutack/seedrlike/internal/api/response"
 	"github.com/plutack/seedrlike/internal/core/queue"
 	"github.com/plutack/seedrlike/views/components"
@@ -38,17 +37,7 @@ func sendResponse(w http.ResponseWriter, code int, msg interface{}) { // conside
 
 func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Request) {
 	var err error
-	// var req downloadRequest
-	// if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-	// 	http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
-	// 	return
-	// }
-	// if req.MagnetLink == "" {
-	// 	log.Println("something happened")
-	// 	http.Error(w, "Magnetic link is required ", http.StatusBadRequest)
-	// 	return
-	// }
-	if err := r.ParseForm(); err != nil {
+	if err = r.ParseForm(); err != nil {
 		log.Println("something happened")
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
@@ -82,12 +71,12 @@ func GetDownloadsHandler(w http.ResponseWriter, _ *http.Request) {
 	sendResponse(w, http.StatusOK, resp)
 }
 
-// func StopDownloadTaskHandler(w http.ResponseWriter, r *http.Request) {
-// 	vars := mux.Vars(r)
-// 	torrentID := vars["torrentID"]
+func StopDownloadTaskHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	torrentID := vars["torrentID"]
 
-// 	// TODO: logic to terminate a running download
-// 	var resp response.StopDownloadTaskResponse
+	// TODO: logic to terminate a running download
+	var resp response.StopDownloadTaskResponse
 
-// 	sendResponse(w, http.StatusOK, resp)
-// }
+	sendResponse(w, http.StatusOK, resp)
+}

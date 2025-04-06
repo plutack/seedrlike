@@ -147,31 +147,31 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			}
 			euServer := availableServerInfo.Data.Servers[0].Name
 			//TODO check if task is zipped field is true
-			path := getFolderPath(t.Info().Name)
-			var d string
+			filePath := getFolderPath(t.Info().Name)
+			var zipPath string
 			if task.IsZipped {
-				d = path + ".zip"
-				if err = upload.ZipFolder(path, d); err != nil {
+				zipPath = filePath + ".zip"
+				if err = upload.ZipFolder(filePath, zipPath); err != nil {
 					log.Println("error creating zip", err)
 
 				}
-				path = path + ".zip"
+				err = upload.SendTorrentToServer(zipPath, u, r, euServer, t.InfoHash().String(), db)
+			} else {
+				err = upload.SendTorrentToServer(filePath, u, r, euServer, t.InfoHash().String(), db)
 			}
-			err = upload.SendTorrentToServer(path, u, r, euServer, t.InfoHash().String(), db)
 			if err != nil {
-				log.Printf("failed to upload %s to gofile: %s", path, err)
+				log.Printf("failed to upload %s to gofile: %s", filePath, err)
 			}
 			wm.SendProgress(ws.RefreshUpdate{
 				Type:    "upload refresh",
 				Message: "file uploaded on gofile",
 			})
-
-			err = os.RemoveAll(path)
+			err = os.RemoveAll(filePath)
 			if task.IsZipped {
-				err = os.RemoveAll(d)
+				err = os.RemoveAll(zipPath)
 			}
 			if err != nil {
-				log.Printf("failed to delete %s from host: %s", path, err)
+				log.Printf("failed to delete %s from host: %s", filePath, err)
 			}
 		}
 	}

@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	// "github.com/gorilla/mux"
 	"github.com/plutack/seedrlike/internal/api/response"
 	"github.com/plutack/seedrlike/internal/core/queue"
 	"github.com/plutack/seedrlike/views/components"
@@ -71,12 +71,12 @@ func GetDownloadsHandler(w http.ResponseWriter, _ *http.Request) {
 	sendResponse(w, http.StatusOK, resp)
 }
 
-func StopDownloadTaskHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	torrentID := vars["torrentID"]
+// func StopDownloadTaskHandler(w http.ResponseWriter, r *http.Request) {
+// 	vars := mux.Vars(r)
+// 	torrentID := vars["torrentID"]
 
-	// TODO: logic to terminate a running download
-	var resp response.StopDownloadTaskResponse
+// 	// TODO: logic to terminate a running download
+// 	var resp response.StopDownloadTaskResponse
 
-	sendResponse(w, http.StatusOK, resp)
-}
+// 	sendResponse(w, http.StatusOK, resp)
+// }

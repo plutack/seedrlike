@@ -28,13 +28,13 @@ type (
 		IsZipped   bool
 	}
 
-	activeTorrents map[*torrent.Torrent]bool
+	// activeTorrents map[*torrent.Torrent]bool
 )
 
 var (
-	errorQueueFull  = errors.New("Download Queue full")
-	storagePath     = "/home/plutack/Downloads/seedrlike"
-	ActiveDownloads activeTorrents
+	errorQueueFull = errors.New("Download Queue full")
+	storagePath    = "/home/plutack/Downloads/seedrlike"
+	// ActiveDownloads activeTorrents
 )
 
 func New() *DownloadQueue {
@@ -81,7 +81,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		if _, ok := <-t.GotInfo(); !ok {
 			t.DownloadAll()
 			log.Printf("%s started downloading", t.Info().Name)
-			activeDownloads[t] = true
+			// ActiveDownloads[t] = true
 			t.DisallowDataUpload()
 
 			// Channel to stop Goroutines once complete
@@ -124,7 +124,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			close(stopChan)
 			wg.Wait()
 
-			delete(activeDownloads, t)
+			// delete(ActiveDownloads, t)
 
 			// Final update
 			wm.SendProgress(ws.TorrentUpdate{

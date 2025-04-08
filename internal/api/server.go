@@ -46,9 +46,10 @@ func (s *Server) registerRoutes() {
 
 	s.router.HandleFunc("/", handlers.GetTorrentsFromDBHomepage(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
 	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
-	s.router.HandleFunc("/downloads", handlers.DeleteStaleContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
-	s.router.HandleFunc("/downloads/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
-	s.router.HandleFunc("/downloads/{ID}", handlers.DeleteContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
+	s.router.HandleFunc("/downloads/{ID}", d.StopDownload).Methods(DeleteMethod)
+	s.router.HandleFunc("/contents", handlers.DeleteStaleContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
+	s.router.HandleFunc("/contents/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
+	s.router.HandleFunc("/contents/{ID}", handlers.DeleteContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
 	s.router.HandleFunc("/ws", handlers.UpgradeRequest(s.websocketManager))
 	s.router.HandleFunc("/health", handlers.GetHealth).Methods(GetMethod)
 }

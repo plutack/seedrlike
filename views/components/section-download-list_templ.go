@@ -25,7 +25,7 @@ func returnFolderDownloadUrl(contentID string) string {
 }
 
 func returnContentDeleteUrl(contentID, contentType string) string {
-	return fmt.Sprintf("/downloads/%s?type=%s", contentID, contentType)
+	return fmt.Sprintf("/contents/%s?type=%s", contentID, contentType)
 }
 
 func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, folderID string) templ.Component {
@@ -49,7 +49,7 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"download-list\"><div class=\"w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6\"><div class=\"flex justify-between items-center mb-6\"><h1 class=\"text-2xl sm:text-3xl font-bold\">Downloads</h1><input type=\"button\" class=\"btn btn-sm sm:btn-md\" hx-delete=\"/downloads\" hx-target=\"#download-list\" hx-swap=\"outerHTML\" value=\"Delete stale content\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"content-list\"><div class=\"w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6\"><div class=\"flex justify-between items-center mb-6\"><h1 class=\"text-2xl sm:text-3xl font-bold\">Available Downloads</h1><input type=\"button\" class=\"btn btn-sm sm:btn-md\" hx-delete=\"/contents\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" value=\"Delete stale content\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -83,7 +83,7 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var2 templ.SafeURL = templ.SafeURL("/downloads/" + torrent.ID)
+				var templ_7745c5c3_Var2 templ.SafeURL = templ.SafeURL("/contents/" + torrent.ID)
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var2)))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -93,15 +93,15 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var3 string
-				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("/downloads/" + torrent.ID)
+				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("/contents/" + torrent.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 61, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 61, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" hx-target=\"#download-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" class=\"flex-1 truncate hover:text-primary\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" class=\"flex-1 truncate hover:text-primary\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -146,7 +146,7 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var6 templ.SafeURL = templ.SafeURL("/downloads/" + torrent.ID)
+				var templ_7745c5c3_Var6 templ.SafeURL = templ.SafeURL("/contents/" + torrent.ID)
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var6)))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -156,15 +156,15 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var7 string
-				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("/downloads/" + torrent.ID)
+				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("/contents/" + torrent.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 80, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 80, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" hx-target=\"#download-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" class=\"hidden sm:block truncate hover:text-primary\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" class=\"hidden sm:block truncate hover:text-primary\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -236,7 +236,7 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" hx-target=\"#download-list\" hx-swap=\"outerHTML\" hx-on::htmx:afterRequest=\"htmx.trigger(&#39;#download-list&#39;, &#39;refresh&#39;)\" class=\"flex items-center gap-2\"><span>Delete</span></a></li></ul></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-on::htmx:afterRequest=\"htmx.trigger(&#39;#content-list&#39;, &#39;refresh&#39;)\" class=\"flex items-center gap-2\"><span>Delete</span></a></li></ul></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

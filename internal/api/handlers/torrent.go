@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
 	// "github.com/gorilla/mux"
+	"github.com/gorilla/mux"
 	"github.com/plutack/seedrlike/internal/api/response"
 	"github.com/plutack/seedrlike/internal/core/queue"
 	"github.com/plutack/seedrlike/views/components"
@@ -71,12 +73,32 @@ func GetDownloadsHandler(w http.ResponseWriter, _ *http.Request) {
 	sendResponse(w, http.StatusOK, resp)
 }
 
-// func StopDownloadTaskHandler(w http.ResponseWriter, r *http.Request) {
-// 	vars := mux.Vars(r)
-// 	torrentID := vars["torrentID"]
+func (d *DownloadHandler) StopDownload(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	torrentID := vars["ID"]
 
-// 	// TODO: logic to terminate a running download
-// 	var resp response.StopDownloadTaskResponse
+	var resp response.StopDownloadResponse
+	if torrentID == "" {
+		log.Println("Stop request failed: Missing torrent ID in URL")
+		sendResponse(w, http.StatusBadRequest, "Missing torrent ID in URL path")
+		return
+	} // TODO: logic to terminate a running download
+	log.Printf("Received stop request for torrent ID: %s", torrentID)
 
-// 	sendResponse(w, http.StatusOK, resp)
-// }
+	err := d.queue.Stop(torrentID)
+
+	if err != nil {
+		log.Printf("Error processing stop request for torrent %s: %v", torrentID, err)
+		errMsg := err.Error()
+		if errMsg == fmt.Sprintf("torrent with ID %s not found", torrentID) {
+			sendResponse(w, http.StatusNotFound, errMsg)
+		} else if errMsg == fmt.Sprintf("torrent %s already stopping/stopped", torrentID) || errMsg == fmt.Sprintf("torrent %s already completed/failed", torrentID) {
+			sendResponse(w, http.StatusConflict, errMsg)
+		} else {
+			sendResponse(w, http.StatusInternalServerError, "Failed to stop download torrent")
+		}
+		return
+	}
+	log.Printf("Successfully processed stop request for torrent ID: %s", torrentID)
+	sendResponse(w, http.StatusOK, resp)
+}

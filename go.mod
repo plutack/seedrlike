@@ -1,6 +1,6 @@
 module github.com/plutack/seedrlike
 
-go 1.24.0
+go 1.24.2
 
 require (
 	github.com/a-h/templ v0.3.819

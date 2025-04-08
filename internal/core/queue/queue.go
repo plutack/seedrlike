@@ -392,7 +392,6 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 						uploadPath = zipPath
 					}
 				}
-
 				// Proceed with upload only if zip didn't fail (or wasn't requested)
 				if finalStatus == StatusCompleted {
 					log.Printf("Uploading %s to Gofile server %s", uploadPath, euServer)

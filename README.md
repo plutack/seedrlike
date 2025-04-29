@@ -1,6 +1,3 @@
-<p align="center">
-    <img src="./views/assets/bird.png" align="center" width="200%" height="200%">
-</p>
 <p align="center"><h1 align="center">SEEDRLIKE</h1></p>
 <p align="center">
 </p>

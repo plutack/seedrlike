@@ -12,11 +12,13 @@ import (
 	"path/filepath"
 
 	"github.com/plutack/go-gofile/api"
+	ws "github.com/plutack/seedrlike/internal/core/websocket"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
 )
 
 const RootFolderPlaceholder = "00000000-0000-0000-0000-000000000000"
 
+type progressCallbackFunc func(byteRead, totalBytes int64)
 type folderID = string
 
 func newNullString(s string) sql.NullString {
@@ -78,7 +80,18 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 	return info.Data.ID, nil
 }
 
-func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string) error {
+func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string, wm *ws.WebsocketManager) error {
+	calculateCompleted := func(readByte, totalByte int64) {
+		wm.SendProgress(ws.DownloadUpdate{
+			Type:     "torrent update",
+			ID:       infoHash,
+			Name:     t.Info().Name,
+			Status:   StatusZipping,
+			Progress: returnPercentageCompleted(readByte, totalByte),
+			Speed:    "-",
+			ETA:      "-",
+		})
+	}
 	info, err := uploadClient.UploadFile(server, fullFilePath, parentFolderID)
 
 	if err != nil {
@@ -107,16 +120,44 @@ func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string,
 
 }
 
-func ZipFolder(source string, destination string) error {
+func getPathSize(path string) (int64, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
 
+	if !fileInfo.IsDir() {
+		// It's a file, return its size
+		return fileInfo.Size(), nil
+	}
+
+	// It's a directory, walk through its contents
+	var totalSize int64
+	err = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			totalSize += info.Size()
+		}
+		return nil
+	})
+
+	return totalSize, err
+}
+
+func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progressCallback progressCallbackFunc) error {
 	zipFile, err := os.Create(destination)
 	if err != nil {
 		return err
 	}
 	defer zipFile.Close()
 
+	totalSize, err := getPathSize(source)
 	zipWriter := zip.NewWriter(zipFile)
 	defer zipWriter.Close()
+
+	var totalRead int64
 
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -153,8 +194,14 @@ func ZipFolder(source string, destination string) error {
 			return err
 		}
 		defer srcFile.Close()
+		srcFileWithProgress := &readerProgress{
+			Reader: srcFile,
 
-		_, err = io.Copy(zipEntry, srcFile)
+			totalRead: &totalRead,
+			totalSize: totalSize,
+			onRead:    progressCallback,
+		}
+		_, err = io.Copy(zipEntry, srcFileWithProgress)
 		return err
 	})
 }

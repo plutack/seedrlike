@@ -21,8 +21,10 @@ const (
 	StatusPending     = "pending"
 	StatusStarted     = "started"
 	StatusCompleted   = "completed"
+	StatusUploading   = "uploading"
 	StatusDownloading = "downloading"
 	StatusFailed      = "failed"
+	StatusZipping     = "zipping"
 	StatusStopping    = "stopping"
 	StatusStopped     = "stopped"
 	maxQueueSize      = 10
@@ -356,7 +358,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		log.Printf("Dropping torrent client state for %s", infoHash)
 		t.Drop() // Essential cleanup
 
-		// --- Determine paths *before* checking status for upload ---
+		// Determine paths before checking status for upload
 		originalPath := ""   // Initialize
 		if t.Info() != nil { // Make sure info is available
 			originalPath = getFolderPath(t.Info().Name)
@@ -368,7 +370,16 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		//  Upload and Cleanup (only if completed successfully or stopped)
 		if finalStatus == StatusCompleted {
 			log.Printf("Starting upload/cleanup for completed task %s", infoHash)
-			availableServerInfo, err := u.GetAvailableServers("eu") // Handle error more gracefully?
+			wm.SendProgress(ws.TorrentUpdate{
+				Type:     "torrent update",
+				ID:       infoHash,
+				Name:     t.Info().Name,
+				Status:   StatusUploading,                                           // completed, failed, stopped
+				Progress: returnPercentageCompleted(t.BytesCompleted(), t.Length()), // Use final progress
+				Speed:    "0",
+				ETA:      finalStatus, // "completed", "failed", "stopped"
+			})
+			availableServerInfo, err := u.GetAvailableServers("eu")
 			if err != nil {
 				log.Printf("Error getting Gofile server for %s: %v. Skipping upload.", infoHash, err)
 				// Update status to Failed? Or add a new "UploadFailed" status? not likely to happen though
@@ -382,7 +393,18 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				if taskToProcess.Request.IsZipped {
 					zipPath := originalPath + ".zip"
 					log.Printf("Zipping folder %s to %s", originalPath, zipPath)
-					if err = upload.ZipFolder(originalPath, zipPath); err != nil {
+					calculateCompleted := func(readByte, totalByte int64) {
+						wm.SendProgress(ws.TorrentUpdate{
+							Type:     "torrent update",
+							ID:       infoHash,
+							Name:     t.Info().Name,
+							Status:   StatusZipping,
+							Progress: returnPercentageCompleted(readByte, totalByte),
+							Speed:    "-",
+							ETA:      "-",
+						})
+					}
+					if err = upload.ZipFolder(originalPath, zipPath, wm, calculateCompleted); err != nil {
 						log.Printf("Error creating zip for %s: %v", infoHash, err)
 						q.mu.Lock()
 						taskToProcess.Status = StatusFailed // Mark as failed if zip fails

@@ -92,3 +92,7 @@ require (
 	modernc.org/sqlite v1.21.1 // indirect
 	zombiezen.com/go/sqlite v0.13.1 // indirect
 )
+
+replace (
+	github.com/plutack/go-gofile => /home/plutack/projects/go-gofile
+)

@@ -28,16 +28,16 @@ templ ActiveDownloads() {
                 ws.onmessage = (event) => {
                     let data = JSON.parse(event.data);
             
-                    if (data.type === 'torrent update'){
+                    if (data.type === 'torrent update' ){
                         torrents[data.id] = data;
-                        if (data.status === 'completed') {
+                        if (data.status === 'completed' || data.status === 'failed') {
                             setTimeout(() => removeTorrent(data.id), 2000);
                         }
-                        return;
+	                	 return;
                     }
             
                     if(data.type === 'upload refresh'){
-                        htmx.trigger('#download-list', 'refresh');
+                        htmx.trigger('#content-list', 'refresh');
                         return;
                     }
                 };

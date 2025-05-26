@@ -18,16 +18,16 @@ import (
 )
 
 const (
-	StatusPending     = "pending"
-	StatusStarted     = "started"
-	StatusCompleted   = "completed"
-	StatusUploading   = "uploading"
-	StatusDownloading = "downloading"
-	StatusFailed      = "failed"
-	StatusZipping     = "zipping"
-	StatusStopping    = "stopping"
-	StatusStopped     = "stopped"
-	maxQueueSize      = 10
+	StatusNextPhase     = "Starting next phase"
+	StatusPending       = "pending"
+	StatusStarted       = "started"
+	StatusTaskCompleted = "completed"
+	StatusUploading     = "uploading"
+	StatusDownloading   = "downloading"
+	StatusFailed        = "failed"
+	StatusZipping       = "zipping"
+	StatusStopped       = "stopped"
+	maxQueueSize        = 10 // TODO: implement a configuaration file
 )
 
 type (
@@ -39,10 +39,6 @@ type (
 		Torrent *torrent.Torrent
 		Status  string
 	}
-
-	// DownloadQueue struct {
-	// 	tasks chan DownloadRequest
-	// }
 
 	DownloadQueue struct {
 		mu    sync.Mutex
@@ -58,7 +54,6 @@ type (
 var (
 	errorQueueFull = errors.New("Download Queue full")
 	storagePath    = "/home/plutack/Downloads/seedrlike"
-	// ActiveDownloads activeTorrents
 )
 
 func NewDownloadTask(r DownloadRequest) *DownloadTask {
@@ -70,27 +65,11 @@ func NewDownloadTask(r DownloadRequest) *DownloadTask {
 	return t
 }
 
-//	func New() *DownloadQueue {
-//		return &DownloadQueue{
-//			tasks: make(chan DownloadRequest, 50), // allow for 50 additions to the queue. anymore will result to a server busy status code client side
-//		}
-//	}
 func New() *DownloadQueue {
 	return &DownloadQueue{
 		tasks: make([]*DownloadTask, 0, maxQueueSize),
 	}
 }
-
-//	func (q *DownloadQueue) Add(r DownloadRequest) error {
-//		select {
-//		case q.tasks <- r:
-//			log.Println("Link added successfully")
-//			return nil
-//		default:
-//			log.Println("Download Queue full")
-//			return errorQueueFull
-//		}
-//	}Dr. Musbahu Mohmmed Bashir
 
 func (q *DownloadQueue) Add(r DownloadRequest) error {
 	q.mu.Lock()
@@ -150,15 +129,15 @@ func (q *DownloadQueue) Stop(taskID string) error {
 		}
 
 		log.Printf("Stopping active torrent download for task %s", taskID)
-		taskToStop.Status = StatusStopping // Signal ProcessTasks loop to break
+		taskToStop.Status = StatusStopped // Signal ProcessTasks loop to break
 
 		return nil
 
-	case StatusStopping, StatusStopped:
+	case StatusStopped:
 		log.Printf("Task %s is already stopping or stopped.", taskID)
 		return fmt.Errorf("task %s already stopping/stopped", taskID)
 
-	case StatusCompleted, StatusFailed:
+	case StatusTaskCompleted, StatusFailed:
 		log.Printf("Task %s is already completed or failed, cannot stop.", taskID)
 		return fmt.Errorf("task %s already completed/failed", taskID)
 
@@ -168,7 +147,7 @@ func (q *DownloadQueue) Stop(taskID string) error {
 	}
 }
 
-// Helper function to remove task by ID (must be called within a lock)
+// Helper function to remove task by ID (must be called within a mutex lock)
 func (q *DownloadQueue) removeTaskByID_unsafe(id string) {
 	if id == "" {
 		log.Println("Warning: Attempted to remove task with empty ID")
@@ -223,13 +202,13 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			Type:     "torrent update",
 			ID:       t.InfoHash().String(),
 			Name:     "unknown",
-			Status:   "pending",
+			Status:   StatusPending,
 			Progress: 0,
 			Speed:    "0",
 			ETA:      "calculating...",
 		})
 		log.Printf("Waiting for torrent info for magnet link: %s", taskToProcess.Request.MagnetLink)
-		infoCtx, cancelInfo := context.WithTimeout(context.Background(), 2*time.Minute)
+		infoCtx, cancelInfo := context.WithTimeout(context.Background(), 1*time.Minute)
 		select {
 		case <-t.GotInfo():
 			log.Printf("Got info successfully for %s:", t.Info().Name)
@@ -239,6 +218,16 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			t.Drop()
 			q.mu.Lock()
 			taskToProcess.Status = StatusFailed
+			// remove task here too
+			wm.SendProgress(ws.TorrentUpdate{
+				Type:     "torrent update",
+				ID:       t.InfoHash().String(),
+				Name:     "unknown",
+				Status:   StatusFailed,
+				Progress: 0,
+				Speed:    "0",
+				ETA:      "--:--",
+			})
 			q.mu.Unlock()
 			cancelInfo()
 			continue
@@ -315,7 +304,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			q.mu.Lock()
 			currentStatus := taskToProcess.Status
 			q.mu.Unlock()
-			if currentStatus == StatusStopping || currentStatus == StatusStopped {
+			if currentStatus == StatusStopped {
 				log.Printf("Download loop interrupted for %s because status is %s", infoHash, currentStatus)
 				break
 			}
@@ -328,20 +317,20 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		wg.Wait()
 		log.Printf("Progress update goroutine finished for %s.", infoHash)
 
-		finalStatus := StatusCompleted
+		nextPhase := StatusNextPhase
 		// Check if it was stopped externally (implement Stop method later)
 		q.mu.Lock()
-		if taskToProcess.Status == StatusStopping || taskToProcess.Status == StatusStopped {
-			finalStatus = StatusStopped
+		if taskToProcess.Status == StatusStopped {
+			nextPhase = StatusStopped
 			log.Printf("Task %s marked as Stopped.", infoHash)
 		} else if !t.Complete().Bool() {
 			// It exited the loop but isn't complete and wasn't stopped -> Failed?
-			finalStatus = StatusFailed
+			nextPhase = StatusFailed
 			log.Printf("Task %s exited download loop but is not complete and not stopped. Marking as Failed.", infoHash)
 		} else {
 			log.Printf("Task %s completed successfully.", infoHash)
 		}
-		taskToProcess.Status = finalStatus
+		taskToProcess.Status = nextPhase
 		q.mu.Unlock()
 
 		// Send final websocket update based on status
@@ -349,10 +338,10 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			Type:     "torrent update",
 			ID:       infoHash,
 			Name:     t.Info().Name,
-			Status:   finalStatus,                                               // completed, failed, stopped
+			Status:   nextPhase,                                                 // completed, failed, stopped
 			Progress: returnPercentageCompleted(t.BytesCompleted(), t.Length()), // Use final progress
 			Speed:    "0",
-			ETA:      finalStatus, // "completed", "failed", "stopped"
+			ETA:      "--:--", // "completed", "failed", "stopped"
 		})
 
 		log.Printf("Dropping torrent client state for %s", infoHash)
@@ -368,16 +357,16 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		uploadPath := originalPath
 
 		//  Upload and Cleanup (only if completed successfully or stopped)
-		if finalStatus == StatusCompleted {
+		if nextPhase == StatusNextPhase {
 			log.Printf("Starting upload/cleanup for completed task %s", infoHash)
 			wm.SendProgress(ws.TorrentUpdate{
 				Type:     "torrent update",
 				ID:       infoHash,
 				Name:     t.Info().Name,
-				Status:   StatusUploading,                                           // completed, failed, stopped
-				Progress: returnPercentageCompleted(t.BytesCompleted(), t.Length()), // Use final progress
+				Status:   StatusUploading,
+				Progress: 0.00,
 				Speed:    "0",
-				ETA:      finalStatus, // "completed", "failed", "stopped"
+				ETA:      "uploading...",
 			})
 			availableServerInfo, err := u.GetAvailableServers("eu")
 			if err != nil {
@@ -386,50 +375,108 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				q.mu.Lock()
 				taskToProcess.Status = StatusFailed // Mark as failed if server fetch fails
 				q.mu.Unlock()
+				// TODO: cleanup? and continue to eliminate nested else/ifs
 			} else {
 				euServer := availableServerInfo.Data.Servers[0].Name // TODO: create a function to randomize server selection
+				fmt.Printf("selected server:%s", euServer)
 				uploadPath = originalPath
 
 				if taskToProcess.Request.IsZipped {
 					zipPath := originalPath + ".zip"
 					log.Printf("Zipping folder %s to %s", originalPath, zipPath)
-					calculateCompleted := func(readByte, totalByte int64) {
+					calculateZipProgress := func(readByte, totalByte int64) {
+						var progress float64 = 0
+						if totalByte > 0 {
+							progress = float64(readByte) * 100 / float64(totalByte)
+						}
+
+						// Round to 2 decimal places
+						progress = math.Round(progress*100) / 100
+
 						wm.SendProgress(ws.TorrentUpdate{
 							Type:     "torrent update",
 							ID:       infoHash,
 							Name:     t.Info().Name,
 							Status:   StatusZipping,
-							Progress: returnPercentageCompleted(readByte, totalByte),
+							Progress: progress,
 							Speed:    "-",
-							ETA:      "-",
+							ETA:      "--:--",
 						})
 					}
-					if err = upload.ZipFolder(originalPath, zipPath, wm, calculateCompleted); err != nil {
+					if err = upload.ZipFolder(originalPath, zipPath, wm, calculateZipProgress); err != nil {
 						log.Printf("Error creating zip for %s: %v", infoHash, err)
 						q.mu.Lock()
 						taskToProcess.Status = StatusFailed // Mark as failed if zip fails
 						q.mu.Unlock()
-						finalStatus = StatusFailed
+						nextPhase = StatusFailed
+						wm.SendProgress(ws.TorrentUpdate{
+							Type:     "torrent update",
+							ID:       infoHash,
+							Name:     t.Info().Name,
+							Status:   nextPhase,
+							Progress: 0,
+							Speed:    "-",
+							ETA:      "--:--",
+						})
 					} else {
 						uploadPath = zipPath
+						wm.SendProgress(ws.TorrentUpdate{
+							Type:     "torrent update",
+							ID:       infoHash,
+							Name:     t.Info().Name,
+							Status:   StatusNextPhase,
+							Progress: 0,
+							Speed:    "-",
+							ETA:      "--:--",
+						})
 					}
 				}
 				// Proceed with upload only if zip didn't fail (or wasn't requested)
-				if finalStatus == StatusCompleted {
+				if nextPhase == StatusNextPhase {
 					log.Printf("Uploading %s to Gofile server %s", uploadPath, euServer)
-					err = upload.SendTorrentToServer(uploadPath, u, r, euServer, infoHash, db)
+					wm.SendProgress(ws.TorrentUpdate{
+						Type:     "torrent update",
+						ID:       infoHash,
+						Name:     t.Info().Name,
+						Status:   StatusUploading,
+						Progress: 0,
+						Speed:    "-",
+						ETA:      "uploading...",
+					})
+					err = upload.SendTorrentToServerWithProgress(uploadPath, u, r, euServer, infoHash, db, wm, t.Info().Name)
 					if err != nil {
 						log.Printf("Failed to upload %s to gofile for %s: %s", uploadPath, infoHash, err)
-						// Update status?
+						nextPhase = StatusFailed
 						q.mu.Lock()
-						taskToProcess.Status = StatusFailed // Mark as failed if upload fails
+						taskToProcess.Status = nextPhase
 						q.mu.Unlock()
-						finalStatus = StatusFailed // Update local status variable too
+						wm.SendProgress(ws.TorrentUpdate{
+							Type:     "torrent update",
+							ID:       infoHash,
+							Name:     t.Info().Name,
+							Status:   StatusFailed,
+							Progress: 0,
+							Speed:    "-",
+							ETA:      "--:--",
+						})
 					} else {
 						log.Printf("Upload successful for %s", infoHash)
+						nextPhase = StatusTaskCompleted
+						q.mu.Lock()
+						taskToProcess.Status = nextPhase
+						q.mu.Unlock()
+						wm.SendProgress(ws.TorrentUpdate{
+							Type:     "torrent update",
+							ID:       infoHash,
+							Name:     t.Info().Name,
+							Status:   nextPhase,
+							Progress: 100,
+							Speed:    "-",
+							ETA:      "--:--",
+						})
 						wm.SendProgress(ws.RefreshUpdate{ // Send refresh only on successful upload
 							Type:    "upload refresh",
-							Message: "file uploaded on gofile",
+							Message: "content uploaded on gofile",
 						})
 					}
 				}
@@ -463,7 +510,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		q.mu.Unlock()
 		//  Task removed
 
-		log.Printf("Finished processing task %s with final status %s", infoHash, finalStatus)
+		log.Printf("Finished processing task %s with final status %s", infoHash, nextPhase)
 		// The loop will now continue to find the next pending task
 
 	}
@@ -477,7 +524,7 @@ func getDownloadSpeed(t *torrent.Torrent, duration time.Duration) string {
 	// Wait for the specified duration
 	time.Sleep(duration)
 
-	// Final stats
+	// gl stats
 	finalStats := t.Stats()
 	finalBytesRead := finalStats.ConnStats.BytesReadData.Int64()
 

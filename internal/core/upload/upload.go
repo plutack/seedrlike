@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -21,6 +22,26 @@ const RootFolderPlaceholder = "00000000-0000-0000-0000-000000000000"
 type progressCallbackFunc func(byteRead, totalBytes int64)
 type folderID = string
 
+// readerProgress wraps an io.Reader to track read progress
+type readerProgress struct {
+	io.Reader
+	totalRead *int64
+	totalSize int64
+	onRead    progressCallbackFunc
+}
+
+// Read implements io.Reader and updates progress
+func (rp *readerProgress) Read(p []byte) (n int, err error) {
+	n, err = rp.Reader.Read(p)
+	if n > 0 {
+		*rp.totalRead += int64(n)
+		if rp.onRead != nil {
+			rp.onRead(*rp.totalRead, rp.totalSize)
+		}
+	}
+	return
+}
+
 func newNullString(s string) sql.NullString {
 	if s == "" {
 		return sql.NullString{}
@@ -29,6 +50,106 @@ func newNullString(s string) sql.NullString {
 		String: s,
 		Valid:  true,
 	}
+}
+
+// Add this to the upload.go file to enable progress tracking during uploads
+
+// ProgressTrackingUploader handles upload progress reporting
+type ProgressTrackingUploader struct {
+	client          *api.Api
+	websocketMgr    *ws.WebsocketManager
+	torrentID       string  // InfoHash of the torrent
+	torrentName     string  // Name of the torrent
+	totalBytes      int64   // Total bytes to upload
+	totalUploaded   int64   // Running total of bytes uploaded
+	progressPercent float64 // Current progress percentage
+}
+
+// NewProgressTrackingUploader creates a new upload tracker
+func NewProgressTrackingUploader(client *api.Api, wm *ws.WebsocketManager, id string, name string, totalSize int64) *ProgressTrackingUploader {
+	return &ProgressTrackingUploader{
+		client:        client,
+		websocketMgr:  wm,
+		torrentID:     id,
+		torrentName:   name,
+		totalBytes:    totalSize,
+		totalUploaded: 0,
+	}
+}
+
+// UpdateProgress reports upload progress through the websocket
+func (u *ProgressTrackingUploader) UpdateProgress(bytesUploaded int64) {
+	u.totalUploaded += bytesUploaded
+	if u.totalBytes > 0 {
+		newProgress := float64(u.totalUploaded) * 100 / float64(u.totalBytes)
+		// Only send update if progress changed significantly (every 1%)
+		if int(newProgress) > int(u.progressPercent) {
+			u.progressPercent = newProgress
+			// Round to 2 decimal places
+			roundedProgress := math.Round(newProgress*100) / 100
+
+			u.websocketMgr.SendProgress(ws.TorrentUpdate{
+				Type:     "torrent update",
+				ID:       u.torrentID,
+				Name:     u.torrentName,
+				Status:   "uploading",
+				Progress: roundedProgress,
+				Speed:    "-",
+				ETA:      fmt.Sprintf("%.1f%%", roundedProgress),
+			})
+		}
+	}
+}
+
+func returnPercentageCompleted(c, t int64) float64 {
+	percentage := (float64(c) / float64(t)) * 100
+	percentage = min(percentage, 100)
+	sizeInMB := float64(t) / 1000000.0
+	log.Printf("%.2f%% completed out of %.2f MB", percentage, sizeInMB)
+	return math.Round(percentage*100) / 100
+}
+
+// SendTorrentToServerWithProgress uploads a torrent to the server with progress tracking
+func SendTorrentToServerWithProgress(
+	folderPath string,
+	uploadClient *api.Api,
+	rootFolderID string,
+	server string,
+	hash string,
+	db *database.Queries,
+	wm *ws.WebsocketManager,
+	torrentName string) error {
+
+	// Get total size for progress reporting
+	totalSize, err := getPathSize(folderPath)
+	if err != nil {
+		log.Printf("Failed to calculate size for progress tracking: %v", err)
+	}
+
+	tracker := NewProgressTrackingUploader(uploadClient, wm, hash, torrentName, totalSize)
+
+	tracker.websocketMgr.SendProgress(ws.TorrentUpdate{
+		Type:     "torrent update",
+		ID:       tracker.torrentID,
+		Name:     tracker.torrentName,
+		Status:   "uploading",
+		Progress: 0,
+		Speed:    "-",
+		ETA:      "starting upload...",
+	})
+	callbackfunc := func(uploadedByte, totalByte int64) {
+		tracker.websocketMgr.SendProgress(ws.TorrentUpdate{
+			Type:     "torrent update",
+			ID:       tracker.torrentID,
+			Name:     tracker.torrentName,
+			Status:   "uploading",
+			Progress: returnPercentageCompleted(uploadedByte, totalByte),
+			Speed:    "-",
+			ETA:      "starting upload...",
+		})
+
+	}
+	return SendTorrentToServer(folderPath, uploadClient, rootFolderID, server, hash, db, callbackfunc)
 }
 
 func createFolder(folderName string, rootFolderID string, parentFolderID string, uploadClient *api.Api, db *database.Queries, hash string, size int64) (string, error) {
@@ -46,14 +167,15 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 
 	// Create folder in storage service
 	info, err := uploadClient.CreateFolder(parentFolderID, folderName)
-	uploadClient.UpdateContent(info.Data.ID, "public", true)
 	if err != nil {
 		return "", fmt.Errorf("API error creating folder: %w", err)
 	}
 
+	// Make folder public
+	uploadClient.UpdateContent(info.Data.ID, "public", true)
+
 	// For the database entry:
 	// - Otherwise, use the provided parent ID
-
 	parentID := parentFolderID
 	fmt.Printf("calling inside create folder: this is the the parent folder ID: %s ", parentFolderID)
 	if parentFolderID == rootFolderID && hash != "" {
@@ -80,19 +202,8 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 	return info.Data.ID, nil
 }
 
-func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string, wm *ws.WebsocketManager) error {
-	calculateCompleted := func(readByte, totalByte int64) {
-		wm.SendProgress(ws.DownloadUpdate{
-			Type:     "torrent update",
-			ID:       infoHash,
-			Name:     t.Info().Name,
-			Status:   StatusZipping,
-			Progress: returnPercentageCompleted(readByte, totalByte),
-			Speed:    "-",
-			ETA:      "-",
-		})
-	}
-	info, err := uploadClient.UploadFile(server, fullFilePath, parentFolderID)
+func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string, updateCallback progressCallbackFunc) error {
+	info, err := uploadClient.UploadFile(server, fullFilePath, parentFolderID, updateCallback)
 
 	if err != nil {
 		return err
@@ -117,7 +228,6 @@ func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string,
 
 	uploadClient.UpdateContent(info.Data.ParentFolder, "public", true)
 	return nil
-
 }
 
 func getPathSize(path string) (int64, error) {
@@ -154,6 +264,10 @@ func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progr
 	defer zipFile.Close()
 
 	totalSize, err := getPathSize(source)
+	if err != nil {
+		return fmt.Errorf("failed to calculate folder size: %w", err)
+	}
+
 	zipWriter := zip.NewWriter(zipFile)
 	defer zipWriter.Close()
 
@@ -194,9 +308,9 @@ func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progr
 			return err
 		}
 		defer srcFile.Close()
-		srcFileWithProgress := &readerProgress{
-			Reader: srcFile,
 
+		srcFileWithProgress := &readerProgress{
+			Reader:    srcFile,
 			totalRead: &totalRead,
 			totalSize: totalSize,
 			onRead:    progressCallback,
@@ -206,7 +320,8 @@ func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progr
 	})
 }
 
-func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries) error {
+// SendTorrentToServer uploads a torrent to the server with optional progress updates
+func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries, progressCallback progressCallbackFunc) error {
 	// if content is a single torrent file
 	info, err := os.Stat(folderPath)
 	if err != nil {
@@ -216,8 +331,9 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 	if !info.IsDir() {
 		// If it's a single file, upload it directly
 		log.Printf("Uploading single file: %s to root folder: %s\n", folderPath, rootFolderID)
-		return uploadFile(folderPath, rootFolderID, rootFolderID, uploadClient, db, server)
+		return uploadFile(folderPath, rootFolderID, rootFolderID, uploadClient, db, server, progressCallback)
 	}
+
 	// Calculate directory sizes first
 	dirSizes := make(map[string]int64)
 	err = filepath.WalkDir(folderPath, func(path string, d fs.DirEntry, err error) error {
@@ -291,7 +407,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 			}
 
 			log.Printf("Uploading file: %s to folder: %s\n", path, parentID)
-			if err := uploadFile(path, parentID, rootFolderID, uploadClient, db, server); err != nil {
+			if err := uploadFile(path, parentID, rootFolderID, uploadClient, db, server, progressCallback); err != nil {
 				return err
 			}
 		}

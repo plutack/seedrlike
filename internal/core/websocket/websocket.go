@@ -93,10 +93,10 @@ func (wm *WebsocketManager) Run() {
 func (wm *WebsocketManager) SendProgress(u Update) {
 	switch v := u.(type) {
 	case TorrentUpdate:
-		if v.Status == "downloading" || v.Status == "pending" {
+		if v.Status == "downloading" || v.Status == "pending" || v.Status == "uploading" || v.Status == "zipping" {
 			wm.activeDownloads[v.ID] = v
 		}
-		if v.Status == "completed" {
+		if v.Status == "completed" || v.Status == "failed" || v.Status == "stopped" {
 			delete(wm.activeDownloads, v.ID)
 		}
 	case RefreshUpdate:

@@ -141,7 +141,7 @@ Run seedrlike using the following command:
 - [X] **`Task 1`**: <strike>Fix bug: websocket complete event is not sent sometimes</strike>
 - [x] **`Task 2`**: Bug: Fix file display size.
 - [ ] **`Task 3`**: Feat:Add test files.
-- [ ] **`Task 4`**: Feat: Keep track of file status during upload stage and send websocket events based on them.
+- [x] **`Task 4`**: Feat: Keep track of file status during upload stage and send websocket events based on them.
 - [ ] **`Task 5`**: Feat: Switch to viper to handle config variables
 
 ---

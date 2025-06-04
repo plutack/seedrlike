@@ -140,7 +140,7 @@ func DeleteContentFromDB(queries *database.Queries, gofileClient *api.Api, db *s
 		// Commit the transaction
 
 		if err := tx.Commit(); err != nil {
-			fmt.Println("error deleting 4: %s\n", err)
+			fmt.Printf("error deleting 4: %s\n", err)
 			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 			return
 		}

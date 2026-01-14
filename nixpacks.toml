@@ -1,2 +1,10 @@
+[phases.setup]
+nixPkgs = ["go_1_24"]
+
+[variables]
+GOTOOLCHAIN = "local"
+CGO_ENABLED = "0"
+
+
 [start]
 runImage = 'buildpack-deps:jammy-curl'

@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"strings"
+
 	"github.com/plutack/go-gofile/api"
 	ws "github.com/plutack/seedrlike/internal/core/websocket"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
@@ -289,7 +291,17 @@ func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progr
 			return err
 		}
 		header.Name = relPath
-		header.Method = zip.Deflate // Enable compression
+
+		ext := strings.ToLower(filepath.Ext(path))
+		switch ext {
+		case ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm",
+			".mp3", ".wav", ".flac", ".aac", ".ogg",
+			".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
+			".zip", ".rar", ".7z", ".tar", ".gz", ".iso", ".dmg", ".pkg":
+			header.Method = zip.Store
+		default:
+			header.Method = zip.Deflate
+		}
 		if info.IsDir() {
 			header.Name += "/"
 		}
@@ -363,6 +375,9 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 	// Create the first folder under the provided root folder ID
 	baseName := filepath.Base(folderPath)
 	dirSize := dirSizes[folderPath]
+	totalUploadSize := dirSize
+	var bytesUploadedSoFar int64 = 0
+
 	log.Printf("Creating initial folder: %s under parent: %s (Size: %d bytes)\n",
 		baseName, rootFolderID, dirSize)
 
@@ -407,9 +422,22 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 			}
 
 			log.Printf("Uploading file: %s to folder: %s\n", path, parentID)
-			if err := uploadFile(path, parentID, rootFolderID, uploadClient, db, server, progressCallback); err != nil {
+
+			fileInfo, err := d.Info()
+			if err != nil {
+				return fmt.Errorf("failed to get file info for %s: %w", path, err)
+			}
+
+			wrappedCallback := func(read, _ int64) {
+				if progressCallback != nil {
+					progressCallback(bytesUploadedSoFar+read, totalUploadSize)
+				}
+			}
+
+			if err := uploadFile(path, parentID, rootFolderID, uploadClient, db, server, wrappedCallback); err != nil {
 				return err
 			}
+			bytesUploadedSoFar += fileInfo.Size()
 		}
 		return nil
 	})

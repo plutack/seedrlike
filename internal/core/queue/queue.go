@@ -384,6 +384,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				if taskToProcess.Request.IsZipped {
 					zipPath := originalPath + ".zip"
 					log.Printf("Zipping folder %s to %s", originalPath, zipPath)
+					var lastZipProgress int = -1
 					calculateZipProgress := func(readByte, totalByte int64) {
 						var progress float64 = 0
 						if totalByte > 0 {
@@ -393,15 +394,19 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 						// Round to 2 decimal places
 						progress = math.Round(progress*100) / 100
 
-						wm.SendProgress(ws.TorrentUpdate{
-							Type:     "torrent update",
-							ID:       infoHash,
-							Name:     t.Info().Name,
-							Status:   StatusZipping,
-							Progress: progress,
-							Speed:    "-",
-							ETA:      "--:--",
-						})
+						// Only send update if progress changed by at least 1%
+						if int(progress) > lastZipProgress {
+							lastZipProgress = int(progress)
+							wm.SendProgress(ws.TorrentUpdate{
+								Type:     "torrent update",
+								ID:       infoHash,
+								Name:     t.Info().Name,
+								Status:   StatusZipping,
+								Progress: progress,
+								Speed:    "-",
+								ETA:      "--:--",
+							})
+						}
 					}
 					if err = upload.ZipFolder(originalPath, zipPath, wm, calculateZipProgress); err != nil {
 						log.Printf("Error creating zip for %s: %v", infoHash, err)

@@ -1,2 +1,5 @@
+[phases.setup]
+nixPkgs = ['go_1_25', 'curl']
+
 [start]
-runImage = 'buildpack-deps:jammy-curl'
+runImage = 'alpine:latest'

@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ['go_1_25', 'curl']
+nixPkgs = ['go', 'curl']
 
 [start]
 runImage = 'alpine:latest'

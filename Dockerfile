@@ -14,6 +14,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o seedrlike ./cmd/
 # Final stage
 FROM ghcr.io/distroless/static
 
+USER 0:0
+
 EXPOSE 3000
 
 COPY --from=builder /app/seedrlike /seedrlike

@@ -70,7 +70,12 @@ func New() (*Server, error) {
 		return nil, err
 	}
 
-	u := api.New(nil)
+	timeout := 0
+	retryCount := 2
+	u := api.New(&api.Options{
+		RetryCount: &retryCount,
+		Timeout: &timeout,
+	})
 	q := queue.New()
 	wm := ws.New()
 

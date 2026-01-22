@@ -22,29 +22,48 @@ templ ActiveDownloads() {
                 }
             }"
 			x-init="
-                let protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-                let ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
-    
-                ws.onmessage = (event) => {
-                    let data = JSON.parse(event.data);
-            
-                    if (data.type === 'torrent update' ){
-                        torrents[data.id] = data;
-                        if (data.status === 'completed' || data.status === 'failed') {
-                            setTimeout(() => removeTorrent(data.id), 2000);
+                let socket;
+                let reconnectTimer;
+                
+                const connect = () => {
+                    let protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                    socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
+        
+                    socket.onopen = () => {
+                        console.log('WebSocket connected');
+                        if (reconnectTimer) clearTimeout(reconnectTimer);
+                    };
+        
+                    socket.onmessage = (event) => {
+                        let data = JSON.parse(event.data);
+                
+                        if (data.type === 'torrent update' ){
+                            torrents[data.id] = data;
+                            if (data.status === 'completed' || data.status === 'failed') {
+                                setTimeout(() => removeTorrent(data.id), 2000);
+                            }
+                            return;
                         }
-	                	 return;
-                    }
-            
-                    if(data.type === 'upload refresh'){
-                        htmx.trigger('#content-list', 'refresh');
-                        return;
-                    }
+                
+                        if(data.type === 'upload refresh'){
+                            htmx.trigger('#content-list', 'refresh');
+                            return;
+                        }
+                    };
+
+                    socket.onclose = () => {
+                        console.log('WebSocket disconnected. Reconnecting...');
+                        // Optional: Clear torrents or keep them stale? 
+                        torrents = {}; 
+                        reconnectTimer = setTimeout(() => {
+                            connect();
+                        }, 2000); // Fixed 2s delay for simplicity
+                    };
                 };
-                ws.onclose = () => {
-                    torrents = {};
-                };
+
+                connect();
             "
+
 			class="space-y-4"
 			id="download-list"
 		>

@@ -21,7 +21,13 @@ func returnContentDeleteUrl(contentID, contentType string) string {
 }
 
 templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, folderID string) {
-	<div id="content-list">
+	<div
+		id="content-list"
+		hx-get={ "/contents/" + folderID }
+		hx-trigger="refresh from:body"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
 		<div class="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 			<div class="flex justify-between items-center mb-6">
 				<h1 class="text-2xl sm:text-3xl font-bold">Available Downloads</h1>

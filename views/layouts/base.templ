@@ -9,7 +9,7 @@ const (
 	defaultTitle = "seedrlike"
 )
 
-templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderID string) {
+templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderID string, isLoggedIn bool) {
 	<!DOCTYPE html>
 	<html lang="en" class="h-full">
 		<head>
@@ -24,7 +24,7 @@ templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderI
 			<link href="/assets/css/tailwind.css" rel="stylesheet" hx-preserve="true"/>
 		</head>
 		<body class="min-h-screen flex flex-col antialiased">
-			@components.Header()
+			@components.Header(isLoggedIn)
 			<main class="flex-grow">
 				@components.Download()
 				<div id="active-downloads">

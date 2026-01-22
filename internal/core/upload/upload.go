@@ -65,10 +65,11 @@ type ProgressTrackingUploader struct {
 	totalBytes      int64   // Total bytes to upload
 	totalUploaded   int64   // Running total of bytes uploaded
 	progressPercent float64 // Current progress percentage
+	userID          *string
 }
 
 // NewProgressTrackingUploader creates a new upload tracker
-func NewProgressTrackingUploader(client *api.Api, wm *ws.WebsocketManager, id string, name string, totalSize int64) *ProgressTrackingUploader {
+func NewProgressTrackingUploader(client *api.Api, wm *ws.WebsocketManager, id string, name string, totalSize int64, userID *string) *ProgressTrackingUploader {
 	return &ProgressTrackingUploader{
 		client:        client,
 		websocketMgr:  wm,
@@ -76,6 +77,7 @@ func NewProgressTrackingUploader(client *api.Api, wm *ws.WebsocketManager, id st
 		torrentName:   name,
 		totalBytes:    totalSize,
 		totalUploaded: 0,
+		userID:        userID,
 	}
 }
 
@@ -98,6 +100,7 @@ func (u *ProgressTrackingUploader) UpdateProgress(bytesUploaded int64) {
 				Progress: roundedProgress,
 				Speed:    "-",
 				ETA:      fmt.Sprintf("%.1f%%", roundedProgress),
+				UserID:   u.userID,
 			})
 		}
 	}
@@ -120,7 +123,8 @@ func SendTorrentToServerWithProgress(
 	hash string,
 	db *database.Queries,
 	wm *ws.WebsocketManager,
-	torrentName string) error {
+	torrentName string,
+	userID *string) error {
 
 	// Get total size for progress reporting
 	totalSize, err := getPathSize(folderPath)
@@ -128,7 +132,7 @@ func SendTorrentToServerWithProgress(
 		log.Printf("Failed to calculate size for progress tracking: %v", err)
 	}
 
-	tracker := NewProgressTrackingUploader(uploadClient, wm, hash, torrentName, totalSize)
+	tracker := NewProgressTrackingUploader(uploadClient, wm, hash, torrentName, totalSize, userID)
 
 	tracker.websocketMgr.SendProgress(ws.TorrentUpdate{
 		Type:     "torrent update",
@@ -138,6 +142,7 @@ func SendTorrentToServerWithProgress(
 		Progress: 0,
 		Speed:    "-",
 		ETA:      "starting upload...",
+		UserID:   userID,
 	})
 	callbackfunc := func(uploadedByte, totalByte int64) {
 		tracker.websocketMgr.SendProgress(ws.TorrentUpdate{
@@ -148,13 +153,14 @@ func SendTorrentToServerWithProgress(
 			Progress: returnPercentageCompleted(uploadedByte, totalByte),
 			Speed:    "-",
 			ETA:      "starting upload...",
+			UserID:   userID,
 		})
 
 	}
-	return SendTorrentToServer(folderPath, uploadClient, rootFolderID, server, hash, db, callbackfunc)
+	return SendTorrentToServer(folderPath, uploadClient, rootFolderID, server, hash, db, callbackfunc, userID)
 }
 
-func createFolder(folderName string, rootFolderID string, parentFolderID string, uploadClient *api.Api, db *database.Queries, hash string, size int64) (string, error) {
+func createFolder(folderName string, rootFolderID string, parentFolderID string, uploadClient *api.Api, db *database.Queries, hash string, size int64, userID *string) (string, error) {
 	// Skip parent folder check if this is a torrent root folder (it will have a hash)
 	if parentFolderID != "" && hash == "" {
 		// Only check parent existence for subfolders (non-root folders)
@@ -184,6 +190,11 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 		parentID = RootFolderPlaceholder
 	}
 
+	userIDParams := sql.NullString{}
+	if userID != nil {
+		userIDParams = sql.NullString{String: *userID, Valid: true}
+	}
+
 	folderDetails := database.CreateFolderParams{
 		ID:   info.Data.ID,
 		Name: folderName,
@@ -193,9 +204,10 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 		},
 		Size:           size,
 		ParentFolderID: parentID,
+		UserID:         userIDParams,
 	}
-	log.Printf("Creating folder in DB: ID=%s, Name=%s, Parent=%v, Hash=%s, Size=%d\n",
-		info.Data.ID, folderName, parentFolderID, hash, size)
+	log.Printf("Creating folder in DB: ID=%s, Name=%s, Parent=%v, Hash=%s, Size=%d, UserID=%v\n",
+		info.Data.ID, folderName, parentFolderID, hash, size, userID)
 
 	if err := db.CreateFolder(context.Background(), folderDetails); err != nil {
 		return "", fmt.Errorf("database error: %w", err)
@@ -204,7 +216,7 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 	return info.Data.ID, nil
 }
 
-func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string, updateCallback progressCallbackFunc) error {
+func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string, updateCallback progressCallbackFunc, userID *string) error {
 	info, err := uploadClient.UploadFile(server, fullFilePath, parentFolderID, updateCallback)
 
 	if err != nil {
@@ -215,6 +227,11 @@ func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string,
 		folderID = RootFolderPlaceholder
 	}
 
+	userIDParams := sql.NullString{}
+	if userID != nil {
+		userIDParams = sql.NullString{String: *userID, Valid: true}
+	}
+
 	fileDetails := database.CreateFileParams{
 		ID:       info.Data.ID,
 		Name:     info.Data.Name,
@@ -223,6 +240,7 @@ func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string,
 		Mimetype: info.Data.Mimetype,
 		Md5:      info.Data.MD5,
 		Server:   info.Data.Servers[0],
+		UserID:   userIDParams,
 	}
 	if err := db.CreateFile(context.Background(), fileDetails); err != nil {
 		return err
@@ -333,7 +351,7 @@ func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progr
 }
 
 // SendTorrentToServer uploads a torrent to the server with optional progress updates
-func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries, progressCallback progressCallbackFunc) error {
+func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID string, server string, hash string, db *database.Queries, progressCallback progressCallbackFunc, userID *string) error {
 	// if content is a single torrent file
 	info, err := os.Stat(folderPath)
 	if err != nil {
@@ -343,7 +361,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 	if !info.IsDir() {
 		// If it's a single file, upload it directly
 		log.Printf("Uploading single file: %s to root folder: %s\n", folderPath, rootFolderID)
-		return uploadFile(folderPath, rootFolderID, rootFolderID, uploadClient, db, server, progressCallback)
+		return uploadFile(folderPath, rootFolderID, rootFolderID, uploadClient, db, server, progressCallback, userID)
 	}
 
 	// Calculate directory sizes first
@@ -381,7 +399,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 	log.Printf("Creating initial folder: %s under parent: %s (Size: %d bytes)\n",
 		baseName, rootFolderID, dirSize)
 
-	initialFolderID, err := createFolder(baseName, rootFolderID, rootFolderID, uploadClient, db, hash, dirSize)
+	initialFolderID, err := createFolder(baseName, rootFolderID, rootFolderID, uploadClient, db, hash, dirSize, userID)
 	if err != nil {
 		return fmt.Errorf("failed to create initial folder: %w", err)
 	}
@@ -409,7 +427,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 			log.Printf("Creating subfolder: %s under parent: %s (Size: %d bytes)\n",
 				d.Name(), parentID, dirSize)
 
-			newFolderID, createErr := createFolder(d.Name(), rootFolderID, parentID, uploadClient, db, "", dirSize)
+			newFolderID, createErr := createFolder(d.Name(), rootFolderID, parentID, uploadClient, db, "", dirSize, userID)
 			if createErr != nil {
 				return fmt.Errorf("failed to create folder %s: %w", d.Name(), createErr)
 			}
@@ -434,7 +452,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 				}
 			}
 
-			if err := uploadFile(path, parentID, rootFolderID, uploadClient, db, server, wrappedCallback); err != nil {
+			if err := uploadFile(path, parentID, rootFolderID, uploadClient, db, server, wrappedCallback, userID); err != nil {
 				return err
 			}
 			bytesUploadedSoFar += fileInfo.Size()

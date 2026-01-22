@@ -42,20 +42,35 @@ type Response struct {
 var storagePath = "/home/plutack/Downloads/seedrlike"
 
 func (s *Server) registerRoutes() {
-	d := handlers.NewDownloadHandler(s.queue)
+	// Static files first - NO Middleware
+	s.router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.FS(assets.Assets))))
 
-	s.router.HandleFunc("/", handlers.GetTorrentsFromDBHomepage(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
-	s.router.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
-	s.router.HandleFunc("/downloads/{ID}", d.StopDownload).Methods(DeleteMethod)
-	s.router.HandleFunc("/contents", handlers.DeleteStaleContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
-	s.router.HandleFunc("/contents/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
-	s.router.HandleFunc("/contents/{ID}", handlers.DeleteContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
-	s.router.HandleFunc("/ws", handlers.UpgradeRequest(s.websocketManager))
-	s.router.HandleFunc("/health", handlers.GetHealth).Methods(GetMethod)
+	// Subrouter for application routes - WITH Middleware
+	// We use PathPrefix("/") but rely on order: assets are matched first.
+	apiRouter := s.router.PathPrefix("/").Subrouter()
+	apiRouter.Use(handlers.AuthMiddleware)
+
+	d := handlers.NewDownloadHandler(s.queue)
+	authHandler := handlers.NewAuthHandler(s.dbQueries)
+
+	apiRouter.HandleFunc("/login", authHandler.LoginPage).Methods(GetMethod)
+	apiRouter.HandleFunc("/login", authHandler.Login).Methods(PostMethod)
+	apiRouter.HandleFunc("/register", authHandler.RegisterPage).Methods(GetMethod)
+	apiRouter.HandleFunc("/register", authHandler.Register).Methods(PostMethod)
+	apiRouter.HandleFunc("/logout", authHandler.Logout).Methods(PostMethod)
+
+	apiRouter.HandleFunc("/", handlers.GetTorrentsFromDBHomepage(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
+	apiRouter.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
+	apiRouter.HandleFunc("/downloads/{ID}", d.StopDownload).Methods(DeleteMethod)
+	apiRouter.HandleFunc("/contents", handlers.DeleteStaleContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
+	apiRouter.HandleFunc("/contents/{ID}", handlers.GetTorrentsFromDB(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
+	apiRouter.HandleFunc("/contents/{ID}", handlers.DeleteContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)
+	apiRouter.HandleFunc("/ws", handlers.UpgradeRequest(s.websocketManager))
+	apiRouter.HandleFunc("/health", handlers.GetHealth).Methods(GetMethod)
 }
 
 func (s *Server) serveStatic() {
-	s.router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.FS(assets.Assets))))
+	// Moved to registerRoutes to control order and middleware application
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +89,7 @@ func New() (*Server, error) {
 	retryCount := 2
 	u := api.New(&api.Options{
 		RetryCount: &retryCount,
-		Timeout: &timeout,
+		Timeout:    &timeout,
 	})
 	q := queue.New()
 	wm := ws.New()
@@ -87,7 +102,7 @@ func New() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, err := sql.Open("mysql", os.Getenv("GOOSE_DBSTRING"))
+	conn, err := sql.Open("mysql", os.Getenv("GOOSE_DBSTRING")+"?parseTime=true")
 	if err != nil {
 		panic(err)
 	}
@@ -105,7 +120,6 @@ func New() (*Server, error) {
 		dbQueries:        db,
 		websocketManager: wm,
 	}
-	s.serveStatic()
 	s.registerRoutes()
 	go wm.Run()
 	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID, s.dbQueries, wm)

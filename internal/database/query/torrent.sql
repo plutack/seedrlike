@@ -5,19 +5,23 @@ WITH RECURSIVE folder_contents AS (
            Name, 
            Size, 
            DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
-           '' as Server
+           '' as Server,
+           User_ID
     FROM Folders 
     WHERE Parent_Folder_ID = ?
     AND ID != '00000000-0000-0000-0000-000000000000'
+    AND (Folders.User_ID IS NULL OR Folders.User_ID = sqlc.narg('user_id'))
     UNION ALL
     SELECT 'file' AS type,
            ID,
            Name,
            Size,
            DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
-           Server
+           Server,
+           User_ID
     FROM Files 
     WHERE Folder_ID = ?
+    AND (Files.User_ID IS NULL OR Files.User_ID = sqlc.narg('user_id'))
 )
 SELECT type, ID, Name, Size, Date_Added, Server 
 FROM folder_contents
@@ -29,9 +33,10 @@ INSERT INTO Folders (
     Name,
     Hash,
     Size,
-    Parent_Folder_ID
+    Parent_Folder_ID,
+    User_ID
 ) VALUES (
-    ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?
 );
 
 -- name: CreateFile :exec
@@ -42,9 +47,10 @@ INSERT INTO Files (
     Size,
     Mimetype,
     MD5,
-    Server
+    Server,
+    User_ID
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?
 );
 
 -- name: GetFolderByID :one

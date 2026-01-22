@@ -1,6 +1,6 @@
 package components
 
-templ Navigation() {
+templ Navigation(isLoggedIn bool) {
 	<nav x-data="{ isOpen: false }" class="bg-slate-100 shadow dark:bg-gray-800">
 		<div class="container px-6 py-4 mx-auto">
 			<div class="lg:flex lg:items-center">
@@ -31,6 +31,12 @@ templ Navigation() {
 					<div hx-boost="true" hx-target="#content" hx-swap="innerHTML show:window:top" class="flex flex-col text-gray-600 capitalize dark:text-gray-300 lg:flex lg:px-16 lg:flex-row lg:items-center">
 						for _, link := range navigationLinks {
 							<a href={ templ.URL(link.Href) } @click="isOpen = false" class="mt-2 transition-colors duration-300 transform lg:mt-0 lg:mx-4 hover:text-gray-900 dark:hover:text-gray-200">{ link.Text }</a>
+						}
+						if isLoggedIn {
+							<a href="#" hx-post="/logout" hx-swap="none" @click="isOpen = false" class="mt-2 transition-colors duration-300 transform lg:mt-0 lg:mx-4 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer">Logout</a>
+						} else {
+							<a href="/login" @click="isOpen = false" class="mt-2 transition-colors duration-300 transform lg:mt-0 lg:mx-4 hover:text-gray-900 dark:hover:text-gray-200">Login</a>
+							<a href="/register" @click="isOpen = false" class="mt-2 transition-colors duration-300 transform lg:mt-0 lg:mx-4 hover:text-gray-900 dark:hover:text-gray-200">Register</a>
 						}
 					</div>
 					<div class="flex justify-center mt-6 lg:flex lg:mt-0 lg:-mx-2">

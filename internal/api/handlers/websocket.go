@@ -25,7 +25,12 @@ func UpgradeRequest(wm *ws.WebsocketManager) http.HandlerFunc {
 		}
 
 		log.Println("A new user connected")
-		wm.RegisterClient(conn)
+		userID, _ := r.Context().Value(UserIDKey).(string)
+		var userIDPtr *string
+		if userID != "" {
+			userIDPtr = &userID
+		}
+		wm.RegisterClient(conn, userIDPtr)
 		defer wm.UnregisterClient(conn)
 
 		// Keep connection open to handle potential disconnections

@@ -18,9 +18,10 @@ INSERT INTO Files (
     Size,
     Mimetype,
     MD5,
-    Server
+    Server,
+    User_ID
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?
 )
 `
 
@@ -32,6 +33,7 @@ type CreateFileParams struct {
 	Mimetype string
 	Md5      string
 	Server   string
+	UserID   sql.NullString
 }
 
 func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) error {
@@ -43,6 +45,7 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) error {
 		arg.Mimetype,
 		arg.Md5,
 		arg.Server,
+		arg.UserID,
 	)
 	return err
 }
@@ -53,9 +56,10 @@ INSERT INTO Folders (
     Name,
     Hash,
     Size,
-    Parent_Folder_ID
+    Parent_Folder_ID,
+    User_ID
 ) VALUES (
-    ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?
 )
 `
 
@@ -65,6 +69,7 @@ type CreateFolderParams struct {
 	Hash           sql.NullString
 	Size           int64
 	ParentFolderID string
+	UserID         sql.NullString
 }
 
 func (q *Queries) CreateFolder(ctx context.Context, arg CreateFolderParams) error {
@@ -74,6 +79,7 @@ func (q *Queries) CreateFolder(ctx context.Context, arg CreateFolderParams) erro
 		arg.Hash,
 		arg.Size,
 		arg.ParentFolderID,
+		arg.UserID,
 	)
 	return err
 }
@@ -129,7 +135,7 @@ func (q *Queries) FolderExists(ctx context.Context, id string) (bool, error) {
 }
 
 const getFilesByFolderID = `-- name: GetFilesByFolderID :many
-SELECT id, name, folder_id, size, mimetype, md5, server, date_added FROM Files
+SELECT id, name, folder_id, size, mimetype, md5, server, date_added, user_id FROM Files
 WHERE Folder_ID = ?
 `
 
@@ -151,6 +157,7 @@ func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID string) ([]Fi
 			&i.Md5,
 			&i.Server,
 			&i.DateAdded,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -166,7 +173,7 @@ func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID string) ([]Fi
 }
 
 const getFolderByID = `-- name: GetFolderByID :one
-SELECT id, name, hash, size, parent_folder_id, date_added FROM Folders
+SELECT id, name, hash, size, parent_folder_id, date_added, user_id FROM Folders
 WHERE ID = ?
 `
 
@@ -180,6 +187,7 @@ func (q *Queries) GetFolderByID(ctx context.Context, id string) (Folder, error) 
 		&i.Size,
 		&i.ParentFolderID,
 		&i.DateAdded,
+		&i.UserID,
 	)
 	return i, err
 }
@@ -191,19 +199,23 @@ WITH RECURSIVE folder_contents AS (
            Name, 
            Size, 
            DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
-           '' as Server
+           '' as Server,
+           User_ID
     FROM Folders 
     WHERE Parent_Folder_ID = ?
     AND ID != '00000000-0000-0000-0000-000000000000'
+    AND (Folders.User_ID IS NULL OR Folders.User_ID = ?)
     UNION ALL
     SELECT 'file' AS type,
            ID,
            Name,
            Size,
            DATE_FORMAT(Date_Added, '%Y-%m-%d %H:%i:%s') as Date_Added,
-           Server
+           Server,
+           User_ID
     FROM Files 
     WHERE Folder_ID = ?
+    AND (Files.User_ID IS NULL OR Files.User_ID = ?)
 )
 SELECT type, ID, Name, Size, Date_Added, Server 
 FROM folder_contents
@@ -212,6 +224,7 @@ ORDER BY Date_Added DESC
 
 type GetFolderContentsParams struct {
 	ParentFolderID string
+	UserID         sql.NullString
 	FolderID       string
 }
 
@@ -225,7 +238,12 @@ type GetFolderContentsRow struct {
 }
 
 func (q *Queries) GetFolderContents(ctx context.Context, arg GetFolderContentsParams) ([]GetFolderContentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, getFolderContents, arg.ParentFolderID, arg.FolderID)
+	rows, err := q.db.QueryContext(ctx, getFolderContents,
+		arg.ParentFolderID,
+		arg.UserID,
+		arg.FolderID,
+		arg.UserID,
+	)
 	if err != nil {
 		return nil, err
 	}

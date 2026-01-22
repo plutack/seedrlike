@@ -51,9 +51,16 @@ func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	userID, ok := r.Context().Value(UserIDKey).(string)
+	var userIDPtr *string
+	if ok && userID != "" {
+		userIDPtr = &userID
+	}
+
 	payload := queue.DownloadRequest{
 		MagnetLink: magnetLink,
 		IsZipped:   isZipped,
+		UserID:     userIDPtr,
 	}
 
 	err = d.queue.Add(payload)

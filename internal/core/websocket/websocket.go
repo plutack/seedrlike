@@ -16,6 +16,7 @@ type TorrentUpdate struct {
 	Progress float64 `json:"progress"`
 	Speed    string  `json:"speed"`
 	ETA      string  `json:"eta"`
+	UserID   *string `json:"-"`
 }
 
 type RefreshUpdate struct {
@@ -35,10 +36,15 @@ type Update interface {
 	Stringify() string
 }
 
+type Client struct {
+	Conn   *websocket.Conn
+	UserID *string
+}
+
 type WebsocketManager struct {
-	clients         map[*websocket.Conn]bool
+	clients         map[*websocket.Conn]*string
 	broadcast       chan Update
-	register        chan *websocket.Conn
+	register        chan Client
 	unregister      chan *websocket.Conn
 	progressData    map[string]float64
 	activeDownloads map[string]TorrentUpdate // add other info here?
@@ -47,9 +53,9 @@ type WebsocketManager struct {
 
 func New() *WebsocketManager {
 	return &WebsocketManager{
-		clients:         make(map[*websocket.Conn]bool),
+		clients:         make(map[*websocket.Conn]*string),
 		broadcast:       make(chan (Update)),
-		register:        make(chan (*websocket.Conn)),
+		register:        make(chan (Client)),
 		unregister:      make(chan (*websocket.Conn)),
 		progressData:    make(map[string]float64),
 		activeDownloads: make(map[string]TorrentUpdate),
@@ -60,14 +66,17 @@ func New() *WebsocketManager {
 func (wm *WebsocketManager) Run() {
 	for {
 		select {
-		case c := <-wm.register:
-			wm.clients[c] = true
+		case client := <-wm.register:
+			wm.clients[client.Conn] = client.UserID
 			for _, update := range wm.activeDownloads {
-				err := c.WriteJSON(update)
-				if err != nil {
-					log.Println("Error sending active downloads:", err)
-					c.Close()
-					delete(wm.clients, c)
+				// Filter: Public (UserID nil) OR Owned by user
+				if update.UserID == nil || (client.UserID != nil && *update.UserID == *client.UserID) {
+					err := client.Conn.WriteJSON(update)
+					if err != nil {
+						log.Println("Error sending active downloads:", err)
+						client.Conn.Close()
+						delete(wm.clients, client.Conn)
+					}
 				}
 			}
 
@@ -78,12 +87,23 @@ func (wm *WebsocketManager) Run() {
 			}
 
 		case message := <-wm.broadcast:
-			for c := range wm.clients {
-				err := c.WriteJSON(message)
-				if err != nil {
-					log.Println("WebSocket error:", err)
-					c.Close()
-					delete(wm.clients, c)
+			for conn, userID := range wm.clients {
+				allowed := true
+				if update, ok := message.(TorrentUpdate); ok {
+					if update.UserID != nil {
+						if userID == nil || *userID != *update.UserID {
+							allowed = false
+						}
+					}
+				}
+
+				if allowed {
+					err := conn.WriteJSON(message)
+					if err != nil {
+						log.Println("WebSocket error:", err)
+						conn.Close()
+						delete(wm.clients, conn)
+					}
 				}
 			}
 		}
@@ -105,8 +125,8 @@ func (wm *WebsocketManager) SendProgress(u Update) {
 	wm.broadcast <- u
 }
 
-func (wm *WebsocketManager) RegisterClient(c *websocket.Conn) {
-	wm.register <- c
+func (wm *WebsocketManager) RegisterClient(c *websocket.Conn, userID *string) {
+	wm.register <- Client{Conn: c, UserID: userID}
 }
 
 func (wm *WebsocketManager) UnregisterClient(c *websocket.Conn) {

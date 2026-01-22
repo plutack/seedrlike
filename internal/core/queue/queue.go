@@ -48,6 +48,7 @@ type (
 	DownloadRequest struct {
 		MagnetLink string
 		IsZipped   bool
+		UserID     *string
 	}
 )
 
@@ -206,6 +207,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			Progress: 0,
 			Speed:    "0",
 			ETA:      "calculating...",
+			UserID:   taskToProcess.Request.UserID,
 		})
 		log.Printf("Waiting for torrent info for magnet link: %s", taskToProcess.Request.MagnetLink)
 		infoCtx, cancelInfo := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -227,6 +229,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				Progress: 0,
 				Speed:    "0",
 				ETA:      "--:--",
+				UserID:   taskToProcess.Request.UserID,
 			})
 			q.mu.Unlock()
 			cancelInfo()
@@ -294,6 +297,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 						Progress: progress,
 						Speed:    speed,
 						ETA:      eta,
+						UserID:   currentTask.Request.UserID,
 					})
 				}
 			}
@@ -342,6 +346,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			Progress: returnPercentageCompleted(t.BytesCompleted(), t.Length()), // Use final progress
 			Speed:    "0",
 			ETA:      "--:--", // "completed", "failed", "stopped"
+			UserID:   taskToProcess.Request.UserID,
 		})
 
 		log.Printf("Dropping torrent client state for %s", infoHash)
@@ -367,6 +372,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				Progress: 0.00,
 				Speed:    "0",
 				ETA:      "uploading...",
+				UserID:   taskToProcess.Request.UserID,
 			})
 			availableServerInfo, err := u.GetAvailableServers("eu")
 			if err != nil {
@@ -405,6 +411,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 								Progress: progress,
 								Speed:    "-",
 								ETA:      "--:--",
+								UserID:   taskToProcess.Request.UserID,
 							})
 						}
 					}
@@ -422,6 +429,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 							Progress: 0,
 							Speed:    "-",
 							ETA:      "--:--",
+							UserID:   taskToProcess.Request.UserID,
 						})
 					} else {
 						uploadPath = zipPath
@@ -433,6 +441,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 							Progress: 0,
 							Speed:    "-",
 							ETA:      "--:--",
+							UserID:   taskToProcess.Request.UserID,
 						})
 					}
 				}
@@ -447,8 +456,9 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 						Progress: 0,
 						Speed:    "-",
 						ETA:      "uploading...",
+						UserID:   taskToProcess.Request.UserID,
 					})
-					err = upload.SendTorrentToServerWithProgress(uploadPath, u, r, euServer, infoHash, db, wm, t.Info().Name)
+					err = upload.SendTorrentToServerWithProgress(uploadPath, u, r, euServer, infoHash, db, wm, t.Info().Name, taskToProcess.Request.UserID)
 					if err != nil {
 						log.Printf("Failed to upload %s to gofile for %s: %s", uploadPath, infoHash, err)
 						nextPhase = StatusFailed
@@ -463,6 +473,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 							Progress: 0,
 							Speed:    "-",
 							ETA:      "--:--",
+							UserID:   taskToProcess.Request.UserID,
 						})
 					} else {
 						log.Printf("Upload successful for %s", infoHash)
@@ -478,6 +489,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 							Progress: 100,
 							Speed:    "-",
 							ETA:      "--:--",
+							UserID:   taskToProcess.Request.UserID,
 						})
 						wm.SendProgress(ws.RefreshUpdate{ // Send refresh only on successful upload
 							Type:    "upload refresh",

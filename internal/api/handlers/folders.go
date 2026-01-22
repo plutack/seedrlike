@@ -19,17 +19,25 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 		vars := mux.Vars(r)
 		folderID := vars["ID"]
 
+		userID, _ := r.Context().Value(UserIDKey).(string)
+		var userIDParam sql.NullString
+		if userID != "" {
+			userIDParam = sql.NullString{String: userID, Valid: true}
+		}
+
 		var folderParams database.GetFolderContentsParams
 		if folderID == rootFolderID {
 			rootFolderID = upload.RootFolderPlaceholder
 			folderParams = database.GetFolderContentsParams{
 				ParentFolderID: rootFolderID,
 				FolderID:       folderID,
+				UserID:         userIDParam,
 			}
 		} else {
 			folderParams = database.GetFolderContentsParams{
 				ParentFolderID: folderID,
 				FolderID:       folderID,
+				UserID:         userIDParam,
 			}
 		}
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
@@ -49,18 +57,24 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 
 func GetTorrentsFromDBHomepage(queries *database.Queries, rootFolderID string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := r.Context().Value(UserIDKey).(string)
+		var userIDParam sql.NullString
+		if userID != "" {
+			userIDParam = sql.NullString{String: userID, Valid: true}
+		}
 
 		var folderParams database.GetFolderContentsParams
 		rootFolderID = upload.RootFolderPlaceholder
 		folderParams = database.GetFolderContentsParams{
 			ParentFolderID: rootFolderID,
 			FolderID:       rootFolderID,
+			UserID:         userIDParam,
 		}
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
 		if err != nil {
 			log.Printf("Error fetching folder contents: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			layouts.Base(true, nil, rootFolderID).Render(r.Context(), w)
+			layouts.Base(true, nil, rootFolderID, userID != "").Render(r.Context(), w)
 			return
 		}
 
@@ -70,7 +84,7 @@ func GetTorrentsFromDBHomepage(queries *database.Queries, rootFolderID string) h
 		}
 
 		// Otherwise render the full page
-		layouts.Base(false, torrents, rootFolderID).Render(r.Context(), w)
+		layouts.Base(false, torrents, rootFolderID, userID != "").Render(r.Context(), w)
 	}
 }
 

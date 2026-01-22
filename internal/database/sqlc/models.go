@@ -17,6 +17,7 @@ type File struct {
 	Md5       string
 	Server    string
 	DateAdded sql.NullTime
+	UserID    sql.NullString
 }
 
 type Folder struct {
@@ -26,4 +27,12 @@ type Folder struct {
 	Size           int64
 	ParentFolderID string
 	DateAdded      sql.NullTime
+	UserID         sql.NullString
+}
+
+type User struct {
+	ID           string
+	PasswordHash string
+	CreatedAt    sql.NullTime
+	Username     string
 }

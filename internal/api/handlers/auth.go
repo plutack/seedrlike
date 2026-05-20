@@ -1,5 +1,5 @@
 package handlers
-
+// lol
 import (
 	"context"
 	"database/sql"

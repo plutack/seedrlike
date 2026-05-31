@@ -26,33 +26,44 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 			userIDParam = sql.NullString{String: userID, Valid: true}
 		}
 
-		var folderParams database.GetFolderContentsParams
+		// Root-level items are stored under the placeholder parent id. Use a local
+		// var for the parent lookup so we never mutate the captured rootFolderID
+		// (the handler is built once; mutating it would corrupt later requests).
+		parentFolderID := folderID
 		if folderID == rootFolderID {
-			rootFolderID = upload.RootFolderPlaceholder
-			folderParams = database.GetFolderContentsParams{
-				ParentFolderID: rootFolderID,
-				FolderID:       folderID,
-				UserID:         userIDParam,
-			}
-		} else {
-			folderParams = database.GetFolderContentsParams{
-				ParentFolderID: folderID,
-				FolderID:       folderID,
-				UserID:         userIDParam,
-			}
+			parentFolderID = upload.RootFolderPlaceholder
+		}
+		folderParams := database.GetFolderContentsParams{
+			ParentFolderID: parentFolderID,
+			FolderID:       folderID,
+			UserID:         userIDParam,
 		}
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
 
-		log.Printf("calling get torrents with id: %s, rootFolderID: %s\n\n", folderID, rootFolderID)
+		log.Printf("calling get torrents with id: %s, parentFolderID: %s\n\n", folderID, parentFolderID)
+
+		// htmx navigations want only the list fragment; a direct browser visit
+		// needs the full page (head/CSS/header) or it renders unstyled.
+		// Pass the current folderID so the list's refresh targets THIS folder.
+		isHTMX := r.Header.Get("HX-Request") == "true"
+
 		if err != nil {
 			log.Printf("Error fetching folder contents: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			components.DownloadList(true, nil, rootFolderID, userID != "").Render(r.Context(), w)
+			if isHTMX {
+				components.DownloadList(true, nil, folderID, userID != "").Render(r.Context(), w)
+			} else {
+				layouts.Base(true, nil, folderID, userID != "").Render(r.Context(), w)
+			}
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		components.DownloadList(false, torrents, rootFolderID, userID != "").Render(r.Context(), w)
+		if isHTMX {
+			components.DownloadList(false, torrents, folderID, userID != "").Render(r.Context(), w)
+			return
+		}
+		layouts.Base(false, torrents, folderID, userID != "").Render(r.Context(), w)
 	}
 }
 

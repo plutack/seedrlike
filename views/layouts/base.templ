@@ -22,6 +22,18 @@ templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderI
 			<script defer src="/assets/js/htmx.ext.ws.js" hx-preserve="true"></script>
 			<script defer src="/assets/js/alpine.min.js" hx-preserve="true"></script>
 			<link href="/assets/css/tailwind.css" rel="stylesheet" hx-preserve="true"/>
+			<style hx-preserve="true">[x-cloak]{display:none !important}</style>
+			<script id="theme-init" hx-preserve="true">
+				(function () {
+					var q = new URLSearchParams(location.search).get("theme");
+					var t = (q === "nord" || q === "nord-dark") ? q : localStorage.getItem("theme");
+					if (t !== "nord" && t !== "nord-dark") {
+						t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "nord-dark" : "nord";
+					}
+					document.documentElement.setAttribute("data-theme", t);
+					localStorage.setItem("theme", t);
+				})();
+			</script>
 		</head>
 		<body class="min-h-screen flex flex-col antialiased">
 			@components.Header(isLoggedIn)

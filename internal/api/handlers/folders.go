@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/plutack/go-gofile/api"
+	"github.com/plutack/seedrlike/internal/auth"
 	"github.com/plutack/seedrlike/internal/core/upload"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
 	"github.com/plutack/seedrlike/views/components"
@@ -46,12 +47,12 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 		if err != nil {
 			log.Printf("Error fetching folder contents: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			components.DownloadList(true, nil, rootFolderID).Render(r.Context(), w)
+			components.DownloadList(true, nil, rootFolderID, userID != "").Render(r.Context(), w)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		components.DownloadList(false, torrents, rootFolderID).Render(r.Context(), w)
+		components.DownloadList(false, torrents, rootFolderID, userID != "").Render(r.Context(), w)
 	}
 }
 
@@ -79,7 +80,7 @@ func GetTorrentsFromDBHomepage(queries *database.Queries, rootFolderID string) h
 		}
 
 		if r.Header.Get("HX-Request") == "true" {
-			components.DownloadList(false, torrents, rootFolderID).Render(r.Context(), w)
+			components.DownloadList(false, torrents, rootFolderID, userID != "").Render(r.Context(), w)
 			return
 		}
 
@@ -90,6 +91,7 @@ func GetTorrentsFromDBHomepage(queries *database.Queries, rootFolderID string) h
 
 func DeleteContentFromDB(queries *database.Queries, gofileClient *api.Api, db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := r.Context().Value(UserIDKey).(string)
 		vars := mux.Vars(r)
 		contentID := vars["ID"]
 		q := r.URL.Query()
@@ -164,6 +166,7 @@ func DeleteContentFromDB(queries *database.Queries, gofileClient *api.Api, db *s
 		folderParams := database.GetFolderContentsParams{
 			ParentFolderID: rootFolderID,
 			FolderID:       rootFolderID,
+			UserID:         sql.NullString{String: userID, Valid: userID != ""},
 		}
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
 		if err != nil {
@@ -173,22 +176,53 @@ func DeleteContentFromDB(queries *database.Queries, gofileClient *api.Api, db *s
 
 		// Render updated download list
 		w.WriteHeader(http.StatusOK)
-		components.DownloadList(false, torrents, rootFolderID).Render(r.Context(), w)
+		components.DownloadList(false, torrents, rootFolderID, userID != "").Render(r.Context(), w)
 	}
 }
 
 func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Fetch stale files and folders before deletion
-		staleFiles, err := queries.GetOldFiles(r.Context())
-		if err != nil {
-			http.Error(w, "Failed to fetch stale files", http.StatusInternalServerError)
+		// Only authenticated users may clear stale content.
+		userID, _ := r.Context().Value(UserIDKey).(string)
+		if userID == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		staleFolders, err := queries.GetOldFolders(r.Context())
+
+		// Determine whether the logged-in user is the administrator.
+		user, err := queries.GetUserByID(r.Context(), userID)
 		if err != nil {
-			http.Error(w, "Failed to fetch stale folders", http.StatusInternalServerError)
+			http.Error(w, "Failed to resolve user", http.StatusInternalServerError)
 			return
+		}
+		isAdmin := auth.IsAdmin(user.Username)
+
+		// Fetch stale files and folders before deletion.
+		// Admins wipe everything stale; regular users only clear their own content.
+		var staleFiles, staleFolders []string
+		if isAdmin {
+			staleFiles, err = queries.GetOldFiles(r.Context())
+			if err != nil {
+				http.Error(w, "Failed to fetch stale files", http.StatusInternalServerError)
+				return
+			}
+			staleFolders, err = queries.GetOldFolders(r.Context())
+			if err != nil {
+				http.Error(w, "Failed to fetch stale folders", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			userIDParam := sql.NullString{String: userID, Valid: true}
+			staleFiles, err = queries.GetOldFilesByUser(r.Context(), userIDParam)
+			if err != nil {
+				http.Error(w, "Failed to fetch stale files", http.StatusInternalServerError)
+				return
+			}
+			staleFolders, err = queries.GetOldFoldersByUser(r.Context(), userIDParam)
+			if err != nil {
+				http.Error(w, "Failed to fetch stale folders", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		// Delete from Gofile first
@@ -214,33 +248,51 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 		defer tx.Rollback()
 		qtx := queries.WithTx(tx)
 
-		for _, folderID := range staleFolders {
-			err = qtx.DeleteFilesByFolderIDs(r.Context(), folderID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to delete files in folder %s: %v", folderID, err), http.StatusInternalServerError)
-				return
-			}
-		}
-
-		//  delete stale files
-		for _, fileID := range staleFiles {
-			err = qtx.DeleteFileByID(r.Context(), fileID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to delete file %s: %v", fileID, err), http.StatusInternalServerError)
-				return
-			}
-		}
-
-		//  delete the folders
-		for _, folderID := range staleFolders {
-			// Skip the root folder placeholder
-			if folderID == upload.RootFolderPlaceholder {
+		// Delete each stale folder as a subtree, removing children before their
+		// parents so folder->folder foreign keys are never violated. A folder may
+		// appear inside another stale folder's subtree, so track what's been
+		// handled to avoid deleting it twice.
+		deleted := make(map[string]bool)
+		for _, staleFolderID := range staleFolders {
+			if deleted[staleFolderID] {
 				continue
 			}
 
-			err = qtx.DeleteFolderByID(r.Context(), folderID)
+			// Returns the folder and all its descendants in parent->child order.
+			subtree, err := qtx.GetFoldersToDelete(r.Context(), staleFolderID)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to delete folder %s: %v", folderID, err), http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("Failed to identify subtree for folder %s: %v", staleFolderID, err), http.StatusInternalServerError)
+				return
+			}
+
+			// Remove the files in every folder of the subtree.
+			for _, folderID := range subtree {
+				if err := qtx.DeleteFilesByFolderIDs(r.Context(), folderID); err != nil {
+					http.Error(w, fmt.Sprintf("Failed to delete files in folder %s: %v", folderID, err), http.StatusInternalServerError)
+					return
+				}
+			}
+
+			// Remove the folders child-first (reverse of parent->child order).
+			for i := len(subtree) - 1; i >= 0; i-- {
+				folderID := subtree[i]
+				if folderID == upload.RootFolderPlaceholder || deleted[folderID] {
+					continue
+				}
+				if err := qtx.DeleteFolderByID(r.Context(), folderID); err != nil {
+					http.Error(w, fmt.Sprintf("Failed to delete folder %s: %v", folderID, err), http.StatusInternalServerError)
+					return
+				}
+				deleted[folderID] = true
+			}
+		}
+
+		// Delete any remaining stale files (e.g. files sitting directly in the
+		// root folder, not under a stale folder). Files removed above are
+		// already gone, so deleting by ID here is a harmless no-op for them.
+		for _, fileID := range staleFiles {
+			if err := qtx.DeleteFileByID(r.Context(), fileID); err != nil {
+				http.Error(w, fmt.Sprintf("Failed to delete file %s: %v", fileID, err), http.StatusInternalServerError)
 				return
 			}
 		}
@@ -256,6 +308,7 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 		folderParams := database.GetFolderContentsParams{
 			ParentFolderID: rootFolderID,
 			FolderID:       rootFolderID,
+			UserID:         sql.NullString{String: userID, Valid: userID != ""},
 		}
 		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
 		if err != nil {
@@ -263,8 +316,8 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 			return
 		}
 
-		// Render updated download list
+		// Render updated download list (user is authenticated here)
 		w.WriteHeader(http.StatusOK)
-		components.DownloadList(false, torrents, rootFolderID).Render(r.Context(), w)
+		components.DownloadList(false, torrents, rootFolderID, true).Render(r.Context(), w)
 	}
 }

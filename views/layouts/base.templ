@@ -31,7 +31,7 @@ templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderI
 					@components.ActiveDownloads()
 				</div>
 				<div id="content-container" hx-boost="true">
-					@components.DownloadList(returnErr, torrents, rootFolderID)
+					@components.DownloadList(returnErr, torrents, rootFolderID, isLoggedIn)
 				</div>
 			</main>
 			@components.Footer()

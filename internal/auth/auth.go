@@ -23,6 +23,13 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// IsAdmin reports whether the given username is the configured administrator.
+// The admin account is designated via the ADMIN_USERNAME environment variable.
+func IsAdmin(username string) bool {
+	adminUsername := getEnv("ADMIN_USERNAME", "")
+	return adminUsername != "" && username == adminUsername
+}
+
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	return string(bytes), err

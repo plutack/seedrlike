@@ -64,51 +64,67 @@ templ ActiveDownloads() {
                 connect();
             "
 
-			class="space-y-4"
+			class="space-y-2"
 			id="download-list"
 		>
 			<template x-for="[id, torrent] in Object.entries(torrents)" :key="id">
-				<div class="card bg-base-200 shadow-xl transition-all duration-200 hover:shadow-2xl">
-					<div class="card-body p-4 sm:p-6">
-						<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
-							<h3 class="card-title text-base sm:text-lg break-all" x-text="torrent.name"></h3>
-							<div class="flex items-center gap-2">
-								<div
-									class="badge whitespace-nowrap text-sm"
-									x-text="torrent.status"
-									x-bind:class="{
-                                    'badge-neutral': torrent.status === 'pending',
-                                    'badge-info': torrent.status === 'started',
-                                    'badge-primary': torrent.status === 'downloading',
-                                    'badge-success': torrent.status === 'completed',
-                                    'badge-error': torrent.status === 'failed',
-                                    'badge-secondary': torrent.status === 'stopped'
-                                }"
-								></div>
-								<button
-									class="btn btn-circle btn-sm btn-error"
-									title="Delete download"
-									x-on:click="deleteDownload(id)"
-								>
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-									</svg>
-								</button>
-							</div>
+				<div class="rounded-box border border-base-300 bg-base-100 shadow-sm p-3 sm:p-4 transition-colors">
+					<div class="flex items-center gap-3">
+						<span
+							class="flex-shrink-0"
+							x-bind:class="torrent.status === 'completed' ? 'text-success' : (torrent.status === 'failed' ? 'text-error' : 'text-primary')"
+						>
+							<svg
+								class="w-5 h-5"
+								x-bind:class="{ 'animate-spin': ['started','downloading','uploading','zipping'].includes(torrent.status) }"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<path stroke-linecap="round" d="M21 12a9 9 0 11-6.219-8.56"></path>
+							</svg>
+						</span>
+						<h3
+							class="min-w-0 flex-1 font-medium truncate"
+							x-text="torrent.name"
+							x-bind:title="torrent.name"
+						></h3>
+						<span
+							class="badge badge-sm whitespace-nowrap"
+							x-text="torrent.status"
+							x-bind:class="{
+                                'badge-neutral': torrent.status === 'pending',
+                                'badge-info': torrent.status === 'started',
+                                'badge-primary': torrent.status === 'downloading',
+                                'badge-success': torrent.status === 'completed',
+                                'badge-error': torrent.status === 'failed',
+                                'badge-secondary': torrent.status === 'stopped'
+                            }"
+						></span>
+						<button
+							class="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
+							title="Cancel download"
+							aria-label="Cancel download"
+							x-on:click="deleteDownload(id)"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+							</svg>
+						</button>
+					</div>
+					<div x-show="torrent.status === 'downloading' || torrent.status === 'started'|| torrent.status === 'uploading'|| torrent.status === 'zipping'" class="mt-3">
+						<div class="flex items-center gap-3">
+							<progress
+								class="progress progress-primary flex-1 h-2"
+								x-bind:value="torrent.progress"
+								max="100"
+							></progress>
+							<span class="text-xs font-medium tabular-nums w-12 text-right" x-text="torrent.progress + '%'"></span>
 						</div>
-						<div x-show="torrent.status === 'downloading' || torrent.status === 'started'|| torrent.status === 'uploading'|| torrent.status === 'zipping'" class="mt-4">
-							<div class="flex items-center gap-3 sm:gap-4">
-								<progress
-									class="progress progress-primary w-full"
-									x-bind:value="torrent.progress"
-									max="100"
-								></progress>
-								<span class="text-sm font-medium min-w-[4rem] text-right" x-text="torrent.progress + '%'"></span>
-							</div>
-							<div class="mt-3 flex flex-col sm:flex-row justify-between text-sm text-base-content/70">
-								<span class="whitespace-nowrap" x-text="'Speed: ' + (torrent.speed || '0 KB/s')"></span>
-								<span class="whitespace-nowrap" x-text="'ETA: ' + (torrent.eta || 'calculating...')"></span>
-							</div>
+						<div class="mt-1.5 flex justify-between text-xs text-base-content/60">
+							<span class="whitespace-nowrap" x-text="'↓ ' + (torrent.speed || '0 KB/s')"></span>
+							<span class="whitespace-nowrap" x-text="'ETA ' + (torrent.eta || 'calculating…')"></span>
 						</div>
 					</div>
 				</div>

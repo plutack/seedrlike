@@ -2,6 +2,7 @@ package upload
 
 import (
 	"archive/zip"
+	"bufio"
 	"context"
 	"database/sql"
 	"fmt"
@@ -11,9 +12,11 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"strings"
 
+	kpflate "github.com/klauspost/compress/flate"
 	"github.com/plutack/go-gofile/api"
 	ws "github.com/plutack/seedrlike/internal/core/websocket"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
@@ -276,24 +279,66 @@ func getPathSize(path string) (int64, error) {
 	return totalSize, err
 }
 
-func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progressCallback progressCallbackFunc) error {
+// zipDeflateLevel favors speed over ratio: these archives exist to bundle a
+// folder into one upload to gofile, not to maximize compression. BestSpeed (1)
+// is dramatically faster than the stdlib default (~6) for marginally larger output.
+const zipDeflateLevel = kpflate.BestSpeed
+
+// flateWriterPool reuses klauspost flate writers across entries so we don't
+// allocate (and free) a compressor per file in a folder with many files.
+var flateWriterPool = sync.Pool{
+	New: func() any {
+		w, _ := kpflate.NewWriter(io.Discard, zipDeflateLevel)
+		return w
+	},
+}
+
+// pooledFlateWriter returns its underlying writer to the pool on Close.
+type pooledFlateWriter struct {
+	*kpflate.Writer
+}
+
+func (p pooledFlateWriter) Close() error {
+	err := p.Writer.Close()
+	flateWriterPool.Put(p.Writer)
+	return err
+}
+
+// newFlateCompressor is registered as the zip.Deflate compressor. It swaps the
+// stdlib deflater for klauspost/compress (faster at the same level) and pools writers.
+func newFlateCompressor(w io.Writer) (io.WriteCloser, error) {
+	fw := flateWriterPool.Get().(*kpflate.Writer)
+	fw.Reset(w)
+	return pooledFlateWriter{fw}, nil
+}
+
+func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progressCallback progressCallbackFunc) (err error) {
 	zipFile, err := os.Create(destination)
 	if err != nil {
 		return err
 	}
-	defer zipFile.Close()
+	// Capture the file Close error only if nothing else already failed.
+	defer func() {
+		if cerr := zipFile.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	totalSize, err := getPathSize(source)
 	if err != nil {
 		return fmt.Errorf("failed to calculate folder size: %w", err)
 	}
 
-	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
+	// Buffer writes to disk (1 MiB) so the zip writer's many small writes and the
+	// raw copies of Store'd entries don't each hit a syscall.
+	bufw := bufio.NewWriterSize(zipFile, 1<<20)
+	zipWriter := zip.NewWriter(bufw)
+	zipWriter.RegisterCompressor(zip.Deflate, newFlateCompressor)
 
 	var totalRead int64
+	copyBuf := make([]byte, 1<<20) // reused across files
 
-	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+	walkErr := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -345,9 +390,23 @@ func ZipFolder(source string, destination string, wm *ws.WebsocketManager, progr
 			totalSize: totalSize,
 			onRead:    progressCallback,
 		}
-		_, err = io.Copy(zipEntry, srcFileWithProgress)
+		_, err = io.CopyBuffer(zipEntry, srcFileWithProgress, copyBuf)
 		return err
 	})
+	if walkErr != nil {
+		return walkErr
+	}
+
+	// Order matters: flush the central directory into the buffer, then the buffer
+	// to disk. Surface these errors instead of swallowing them in a defer — a
+	// failed flush means a truncated/corrupt zip we'd otherwise report as success.
+	if err := zipWriter.Close(); err != nil {
+		return fmt.Errorf("failed to finalize zip: %w", err)
+	}
+	if err := bufw.Flush(); err != nil {
+		return fmt.Errorf("failed to flush zip to disk: %w", err)
+	}
+	return nil
 }
 
 // SendTorrentToServer uploads a torrent to the server with optional progress updates

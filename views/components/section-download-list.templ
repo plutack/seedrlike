@@ -28,106 +28,148 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 		hx-target="this"
 		hx-swap="outerHTML"
 	>
-		<div class="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-			<div class="flex justify-between items-center mb-6">
-				<h1 class="text-2xl sm:text-3xl font-bold">Available Downloads</h1>
-				if isLoggedIn {
-					<input
-						type="button"
-						class="btn btn-sm sm:btn-md"
-						hx-delete="/contents"
+		<div class="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+			<!-- Toolbar: breadcrumb + actions -->
+			<div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+				<nav class="flex items-center gap-1.5 text-sm font-medium" aria-label="Breadcrumb">
+					<a href="/" class="inline-flex items-center gap-1.5 hover:text-primary transition-colors">
+						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-6h4v6h3a1 1 0 001-1V10"></path>
+						</svg>
+						Home
+					</a>
+				</nav>
+				<div class="flex items-center gap-2">
+					<button
+						class="btn btn-ghost btn-sm btn-square"
+						title="Refresh"
+						aria-label="Refresh"
+						hx-get={ "/contents/" + folderID }
 						hx-target="#content-list"
 						hx-swap="outerHTML"
-						value="Delete stale content"
-					/>
-				}
+					>
+						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5 9a7 7 0 0112-3l3 3M19 15a7 7 0 01-12 3l-3-3"></path>
+						</svg>
+					</button>
+					if isLoggedIn {
+						<button
+							class="btn btn-outline btn-error btn-sm"
+							hx-delete="/contents"
+							hx-target="#content-list"
+							hx-swap="outerHTML"
+						>
+							Delete stale
+						</button>
+					}
+				</div>
 			</div>
 			if returnErr {
-				<div class="flex justify-center items-center p-8">
-					<p class="text-error text-lg">Cannot fetch item</p>
+				<div role="alert" class="alert alert-error">
+					<span>Cannot fetch item</span>
+				</div>
+			} else if len(torrents) == 0 {
+				<div class="rounded-box border border-dashed border-base-300 bg-base-200/30 py-16 text-center text-base-content/60">
+					<svg class="w-10 h-10 mx-auto mb-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
+					</svg>
+					<p>This folder is empty</p>
 				</div>
 			} else {
-				<div class="bg-base-200 rounded-lg shadow-lg" id="folder-list">
-					<div class="hidden sm:grid sm:grid-cols-[auto,1fr,auto,auto] gap-4 p-4 text-base font-semibold items-center border-b border-base-300">
-						<span class="w-6"></span>
-						<span>Name</span>
-						<span class="text-right pr-4">Size (MB)</span>
-						<span class="text-center">Action</span>
+				<div
+					x-data="{
+						count: 0,
+						sync() { this.count = this.$root.querySelectorAll('.row-check:checked').length; },
+						toggleAll(e) {
+							this.$root.querySelectorAll('.row-check').forEach(c => c.checked = e.target.checked);
+							this.sync();
+						},
+						deleteSelected() {
+							const checked = [...this.$root.querySelectorAll('.row-check:checked')];
+							if (!checked.length) return;
+							if (!confirm('Delete ' + checked.length + ' item(s)?')) return;
+							Promise.all(checked.map(c =>
+								fetch('/contents/' + c.dataset.id + '?type=' + c.dataset.type, { method: 'DELETE' })
+							)).then(() => htmx.trigger('#content-list', 'refresh'));
+						}
+					}"
+					class="rounded-box border border-base-300 bg-base-100 overflow-hidden shadow-sm"
+				>
+					<!-- Selection action bar -->
+					<div
+						x-show="count > 0"
+						x-cloak
+						class="flex items-center justify-between gap-3 px-4 py-2 bg-primary/10 border-b border-base-300 text-sm"
+					>
+						<span x-text="count + ' selected'" class="font-medium"></span>
+						<button class="btn btn-error btn-xs" x-on:click="deleteSelected()">Delete selected</button>
 					</div>
-					<div class="divide-y divide-base-300">
+					<!-- Column header -->
+					<div class="hidden sm:grid sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 px-4 py-2.5 border-b border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wide text-base-content/60">
+						<input type="checkbox" class="checkbox checkbox-sm" aria-label="Select all" x-on:change="toggleAll($event)"/>
+						<span class="w-5"></span>
+						<span>Name</span>
+						<span class="text-right pr-2">Size (MB)</span>
+						<span class="text-center w-20">Actions</span>
+					</div>
+					<!-- Rows -->
+					<div class="divide-y divide-base-200">
 						for _, torrent := range torrents {
-							<div class="grid grid-cols-1 sm:grid-cols-[auto,1fr,auto,auto] gap-2 sm:gap-4 p-4 items-center">
-								<!-- Mobile Layout -->
-								<div class="sm:hidden flex items-center gap-3">
-									if torrent.Type == "folder" {
-										<img src="/assets/images/folder-close.svg" alt="folder" class="w-5 h-5"/>
-									} else {
-										<img src="/assets/images/file.svg" alt="file" class="w-5 h-5"/>
-									}
-									<a
-										href={ templ.SafeURL("/contents/" + torrent.ID) }
-										hx-get={ "/contents/" + torrent.ID }
-										hx-target="#content-list"
-										hx-swap="outerHTML"
-										hx-push-url="true"
-										class="flex-1 truncate hover:text-primary"
-									>
-										{ torrent.Name }
-									</a>
-									<span class="text-sm text-base-content/70">{ formatSize(torrent.Size) } MB</span>
-								</div>
-								<div class="hidden sm:block">
-									if torrent.Type == "folder" {
-										<img src="/assets/images/folder-close.svg" alt="folder" class="w-6 h-6"/>
-									} else {
-										<img src="/assets/images/file.svg" alt="file" class="w-6 h-6"/>
-									}
-								</div>
+							<div class="grid grid-cols-[auto_auto_1fr_auto] sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 px-4 py-2.5 hover:bg-base-200/40 transition-colors">
+								<input
+									type="checkbox"
+									class="row-check checkbox checkbox-sm"
+									data-id={ torrent.ID }
+									data-type={ torrent.Type }
+									aria-label="Select item"
+									x-on:change="sync()"
+								/>
+								if torrent.Type == "folder" {
+									<img src="/assets/images/folder-close.svg" alt="folder" class="w-5 h-5 opacity-80"/>
+								} else {
+									<img src="/assets/images/file.svg" alt="file" class="w-5 h-5 opacity-80"/>
+								}
 								<a
 									href={ templ.SafeURL("/contents/" + torrent.ID) }
 									hx-get={ "/contents/" + torrent.ID }
 									hx-target="#content-list"
 									hx-swap="outerHTML"
 									hx-push-url="true"
-									class="hidden sm:block truncate hover:text-primary"
+									class="truncate hover:text-primary transition-colors"
+									title={ torrent.Name }
 								>
 									{ torrent.Name }
 								</a>
-								<span class="hidden sm:block text-right pr-4">{ formatSize(torrent.Size) }</span>
-								<div class="dropdown dropdown-end w-full sm:w-auto">
-									<div
-										tabindex="0"
-										role="button"
-										class="btn btn-primary w-full sm:w-auto"
+								<span class="text-sm text-base-content/70 text-right tabular-nums pr-2 whitespace-nowrap">{ formatSize(torrent.Size) }</span>
+								<div class="col-span-4 sm:col-auto flex items-center justify-end sm:justify-center gap-1">
+									<a
+										if torrent.Type == "folder" {
+											href={ templ.SafeURL(returnFolderDownloadUrl(torrent.ID)) }
+										} else {
+											href={ templ.SafeURL(returnFileDownloadUrl(torrent.Server, torrent.ID, torrent.Name)) }
+										}
+										target="_blank"
+										class="btn btn-ghost btn-xs btn-square"
+										title="Download"
+										aria-label="Download"
 									>
-										Actions
-									</div>
-									<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
-										<li>
-											<a
-												if torrent.Type == "folder" {
-													href={ templ.SafeURL(returnFolderDownloadUrl(torrent.ID)) }
-												} else {
-													href={ templ.SafeURL(returnFileDownloadUrl(torrent.Server, torrent.ID, torrent.Name)) }
-												}
-												target="_blank"
-												class="flex items-center gap-2"
-											>
-												<span>Download</span>
-											</a>
-										</li>
-										<li>
-											<a
-												hx-delete={ returnContentDeleteUrl(torrent.ID, torrent.Type) }
-												hx-target="#content-list"
-												hx-swap="outerHTML"
-												hx-on::htmx:afterRequest="htmx.trigger('#content-list', 'refresh')"
-												class="flex items-center gap-2"
-											>
-												<span>Delete</span>
-											</a>
-										</li>
-									</ul>
+										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"></path>
+										</svg>
+									</a>
+									<button
+										hx-delete={ returnContentDeleteUrl(torrent.ID, torrent.Type) }
+										hx-target="#content-list"
+										hx-swap="outerHTML"
+										hx-on::htmx:afterRequest="htmx.trigger('#content-list', 'refresh')"
+										class="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
+										title="Delete"
+										aria-label="Delete"
+									>
+										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 0v12a1 1 0 001 1h6a1 1 0 001-1V7"></path>
+										</svg>
+									</button>
 								</div>
 							</div>
 						}

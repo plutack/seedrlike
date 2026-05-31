@@ -29,7 +29,7 @@ func Footer() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<footer class=\"mt-auto py-4 w-full text-center bg-slate-100 dark:bg-gray-900\"><small>created by <a target=\"_blank\" href=\"https://www.github.com/plutack\">Plutack</a></small></footer>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<footer class=\"mt-auto py-4 w-full text-center bg-base-200 text-base-content/60 border-t border-base-300\"><small>created by <a target=\"_blank\" class=\"link link-hover text-primary\" href=\"https://www.github.com/plutack\">Plutack</a></small></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

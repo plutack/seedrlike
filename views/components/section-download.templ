@@ -14,13 +14,13 @@ templ Download() {
 		>
 			<form
 				method="post"
-				class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center"
+				class="flex flex-col sm:flex-row gap-2 sm:items-center"
 				hx-post="/downloads"
 				hx-target="#download-response"
 				hx-swap="innerHTML"
 				hx-on::after-request="if(event.detail.xhr.status === 200) { this.querySelector('input[name=magnet-link]').value=''; this.querySelector('input[name=magnet-link]').dispatchEvent(new Event('input')); }"
 			>
-				<label class="input input-bordered flex items-center gap-2 flex-1 min-w-0">
+				<label class="input input-bordered flex items-center gap-2 w-full sm:flex-1 min-w-0">
 					<img
 						x-show="!isSearch"
 						src="/assets/images/magnet.svg"
@@ -46,25 +46,29 @@ templ Download() {
 						autocomplete="off"
 					/>
 				</label>
-				<label class="label cursor-pointer gap-2 px-1" x-show="!isSearch">
-					<span class="label-text text-sm">Zip</span>
-					<input
-						type="checkbox"
-						checked="checked"
-						name="is-zipped"
-						class="toggle toggle-primary toggle-sm"
-					/>
-				</label>
 				<!--
+					On mobile the input takes its own row; this group sits below it with the
+					Zip toggle on the left and the Add button on the right (not full-width).
 					Search is the next feature: when isSearch becomes true, debounce on the
 					3rd char and hx-get the search API instead of disabling the button.
 				-->
-				<button
-					type="submit"
-					class="btn btn-primary sm:w-28"
-					x-bind:disabled="!isMagnet"
-					x-text="isSearch ? 'Search' : 'Add'"
-				>Add</button>
+				<div class="flex items-center gap-2 justify-between sm:justify-end">
+					<label class="label cursor-pointer gap-2 px-1" x-show="!isSearch">
+						<span class="label-text text-sm">Zip</span>
+						<input
+							type="checkbox"
+							checked="checked"
+							name="is-zipped"
+							class="toggle toggle-primary toggle-sm"
+						/>
+					</label>
+					<button
+						type="submit"
+						class="btn btn-primary px-6 sm:w-28"
+						x-bind:disabled="!isMagnet"
+						x-text="isSearch ? 'Search' : 'Add'"
+					>Add</button>
+				</div>
 			</form>
 			<div
 				id="download-response"

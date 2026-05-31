@@ -105,7 +105,7 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 				return templ_7745c5c3_Err
 			}
 			for _, torrent := range torrents {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"grid grid-cols-[auto_auto_1fr_auto] sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 px-4 py-2.5 hover:bg-base-200/40 transition-colors\"><input type=\"checkbox\" class=\"row-check checkbox checkbox-sm\" data-id=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"grid grid-cols-[auto_1fr_auto] grid-rows-[auto_auto] sm:grid-cols-[auto_auto_1fr_auto_auto] sm:grid-rows-1 items-center gap-x-3 gap-y-0.5 px-3 sm:px-4 py-2.5 hover:bg-base-200/40 transition-colors\"><input type=\"checkbox\" class=\"row-check checkbox checkbox-sm hidden sm:block sm:col-start-1\" data-id=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -136,12 +136,12 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 					return templ_7745c5c3_Err
 				}
 				if torrent.Type == "folder" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<img src=\"/assets/images/folder-close.svg\" alt=\"folder\" class=\"w-5 h-5 opacity-80\"> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<img src=\"/assets/images/folder-close.svg\" alt=\"folder\" class=\"w-5 h-5 opacity-80 col-start-1 row-start-1 row-span-2 sm:col-start-2 sm:row-span-1\"> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<img src=\"/assets/images/file.svg\" alt=\"file\" class=\"w-5 h-5 opacity-80\"> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<img src=\"/assets/images/file.svg\" alt=\"file\" class=\"w-5 h-5 opacity-80 col-start-1 row-start-1 row-span-2 sm:col-start-2 sm:row-span-1\"> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -168,7 +168,7 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" class=\"truncate hover:text-primary transition-colors\" title=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" class=\"col-start-2 row-start-1 sm:col-start-3 truncate hover:text-primary transition-colors\" title=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -194,20 +194,20 @@ func DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fold
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</a> <span class=\"text-sm text-base-content/70 text-right tabular-nums pr-2 whitespace-nowrap\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</a> <span class=\"col-start-2 row-start-2 sm:col-start-4 sm:row-start-1 text-xs text-base-content/60 sm:text-sm sm:text-base-content/70 sm:text-right tabular-nums sm:pr-2 whitespace-nowrap\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(formatSize(torrent.Size))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 143, Col: 124}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 143, Col: 219}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</span><div class=\"col-span-4 sm:col-auto flex items-center justify-end sm:justify-center gap-1\"><a")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"sm:hidden\">MB</span></span><div class=\"col-start-3 row-start-1 row-span-2 sm:col-start-5 sm:row-span-1 flex items-center justify-end gap-0.5 sm:gap-1\"><a")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

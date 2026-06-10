@@ -53,12 +53,12 @@ func (s *Server) registerRoutes() {
 
 	d := handlers.NewDownloadHandler(s.queue)
 	authHandler := handlers.NewAuthHandler(s.dbQueries)
-	// Search talks to the external torrengo service (TORRENGO_URL, default
-	// http://localhost:8080). Credentials must match torrengo's.
+	// Search talks to the external torrentgo service (TORRENTGO_URL, default
+	// http://localhost:8080). Credentials must match the service's USERNAME/PASSWORD.
 	searchHandler := handlers.NewSearchHandler(search.New(
-		os.Getenv("TORRENGO_URL"),
-		os.Getenv("TORRENGO_USERNAME"),
-		os.Getenv("TORRENGO_PASSWORD"),
+		os.Getenv("TORRENTGO_URL"),
+		os.Getenv("TORRENTGO_USERNAME"),
+		os.Getenv("TORRENTGO_PASSWORD"),
 	))
 
 	apiRouter.HandleFunc("/login", authHandler.LoginPage).Methods(GetMethod)

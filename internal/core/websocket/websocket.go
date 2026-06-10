@@ -4,9 +4,14 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+// ProgressBroadcastInterval is the single cadence at which download, zip, and
+// upload progress updates are broadcast, so every phase ticks at the same rate.
+const ProgressBroadcastInterval = 2 * time.Second
 
 type TorrentUpdate struct {
 	Type     string  `json:"type"`
@@ -16,7 +21,11 @@ type TorrentUpdate struct {
 	Progress float64 `json:"progress"`
 	Speed    string  `json:"speed"`
 	ETA      string  `json:"eta"`
-	UserID   *string `json:"-"`
+	// TotalSize and BytesCompleted describe the current phase (download/zip/
+	// upload) in bytes, for an "X of Y" display. 0 when unknown.
+	TotalSize      int64   `json:"total_size"`
+	BytesCompleted int64   `json:"bytes_completed"`
+	UserID         *string `json:"-"`
 }
 
 type RefreshUpdate struct {

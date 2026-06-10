@@ -129,19 +129,31 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 								} else {
 									<img src="/assets/images/file.svg" alt="file" class="w-5 h-5 opacity-80 col-start-1 row-start-1 row-span-2 sm:col-start-2 sm:row-span-1"/>
 								}
-								<a
-									href={ templ.SafeURL("/contents/" + torrent.ID) }
-									hx-get={ "/contents/" + torrent.ID }
-									hx-target="#content-list"
-									hx-swap="outerHTML"
-									hx-push-url="true"
-									class="col-start-2 row-start-1 sm:col-start-3 truncate hover:text-primary transition-colors"
-									title={ torrent.Name }
-								>
-									{ torrent.Name }
-								</a>
+								if torrent.Type == "folder" {
+									<a
+										href={ templ.SafeURL("/contents/" + torrent.ID) }
+										hx-get={ "/contents/" + torrent.ID }
+										hx-target="#content-list"
+										hx-swap="outerHTML"
+										hx-push-url="true"
+										class="col-start-2 row-start-1 sm:col-start-3 truncate hover:text-primary transition-colors"
+										title={ torrent.Name }
+									>
+										{ torrent.Name }
+									</a>
+								} else {
+									<!-- Files are not navigable; the name opens the file download instead. -->
+									<a
+										href={ templ.SafeURL(returnFileDownloadUrl(torrent.Server, torrent.ID, torrent.Name)) }
+										target="_blank"
+										class="col-start-2 row-start-1 sm:col-start-3 truncate hover:text-primary transition-colors"
+										title={ torrent.Name }
+									>
+										{ torrent.Name }
+									</a>
+								}
 								<span class="col-start-2 row-start-2 sm:col-start-4 sm:row-start-1 text-xs text-base-content/60 sm:text-sm sm:text-base-content/70 sm:text-right tabular-nums sm:pr-2 whitespace-nowrap">{ formatSize(torrent.Size) }<span class="sm:hidden"> MB</span></span>
-								<div class="col-start-3 row-start-1 row-span-2 sm:col-start-5 sm:row-span-1 flex items-center justify-end gap-0.5 sm:gap-1">
+								<div class="col-start-3 row-start-1 row-span-2 sm:col-start-5 sm:row-span-1 flex items-center justify-end gap-2 sm:gap-1">
 									<a
 										if torrent.Type == "folder" {
 											href={ templ.SafeURL(returnFolderDownloadUrl(torrent.ID)) }
@@ -149,11 +161,11 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 											href={ templ.SafeURL(returnFileDownloadUrl(torrent.Server, torrent.ID, torrent.Name)) }
 										}
 										target="_blank"
-										class="btn btn-ghost btn-xs btn-square"
+										class="btn btn-ghost btn-sm sm:btn-xs btn-square"
 										title="Download"
 										aria-label="Download"
 									>
-										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<svg class="w-5 h-5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"></path>
 										</svg>
 									</a>
@@ -162,11 +174,11 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 										hx-target="#content-list"
 										hx-swap="outerHTML"
 										hx-on::htmx:afterRequest="htmx.trigger('#content-list', 'refresh')"
-										class="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
+										class="btn btn-ghost btn-sm sm:btn-xs btn-square text-error hover:bg-error/10"
 										title="Delete"
 										aria-label="Delete"
 									>
-										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<svg class="w-5 h-5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 0v12a1 1 0 001 1h6a1 1 0 001-1V7"></path>
 										</svg>
 									</button>

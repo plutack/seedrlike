@@ -258,7 +258,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 
 		go func(currentTask *DownloadTask) {
 			defer wg.Done()
-			ticker := time.NewTicker(2 * time.Second)
+			ticker := time.NewTicker(ws.ProgressBroadcastInterval)
 			defer ticker.Stop()
 			for {
 				select {
@@ -281,7 +281,9 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 
 					speed := getDownloadSpeed(torrentHandle, 1*time.Second) // Shorter duration for calculation?
 					eta := calculateETA(torrentHandle)
-					progress := returnPercentageCompleted(torrentHandle.BytesCompleted(), torrentHandle.Length())
+					completed := torrentHandle.BytesCompleted()
+					total := torrentHandle.Length()
+					progress := returnPercentageCompleted(completed, total)
 
 					q.mu.Lock()
 					// Only update to Downloading if it was Started
@@ -290,14 +292,16 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 					}
 					q.mu.Unlock()
 					wm.SendProgress(ws.TorrentUpdate{
-						Type:     "torrent update",
-						ID:       currentTask.ID,
-						Name:     torrentHandle.Info().Name,
-						Status:   StatusDownloading,
-						Progress: progress,
-						Speed:    speed,
-						ETA:      eta,
-						UserID:   currentTask.Request.UserID,
+						Type:           "torrent update",
+						ID:             currentTask.ID,
+						Name:           torrentHandle.Info().Name,
+						Status:         StatusDownloading,
+						Progress:       progress,
+						Speed:          speed,
+						ETA:            eta,
+						TotalSize:      total,
+						BytesCompleted: completed,
+						UserID:         currentTask.Request.UserID,
 					})
 				}
 			}
@@ -390,7 +394,7 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				if taskToProcess.Request.IsZipped {
 					zipPath := originalPath + ".zip"
 					log.Printf("Zipping folder %s to %s", originalPath, zipPath)
-					var lastZipProgress int = -1
+					var lastZipEmit time.Time
 					calculateZipProgress := func(readByte, totalByte int64) {
 						var progress float64 = 0
 						if totalByte > 0 {
@@ -400,20 +404,24 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 						// Round to 2 decimal places
 						progress = math.Round(progress*100) / 100
 
-						// Only send update if progress changed by at least 1%
-						if int(progress) > lastZipProgress {
-							lastZipProgress = int(progress)
-							wm.SendProgress(ws.TorrentUpdate{
-								Type:     "torrent update",
-								ID:       infoHash,
-								Name:     t.Info().Name,
-								Status:   StatusZipping,
-								Progress: progress,
-								Speed:    "-",
-								ETA:      "--:--",
-								UserID:   taskToProcess.Request.UserID,
-							})
+						// Throttle to the shared broadcast cadence (but always
+						// emit the final byte so it doesn't stall short of 100%).
+						if time.Since(lastZipEmit) < ws.ProgressBroadcastInterval && readByte < totalByte {
+							return
 						}
+						lastZipEmit = time.Now()
+						wm.SendProgress(ws.TorrentUpdate{
+							Type:           "torrent update",
+							ID:             infoHash,
+							Name:           t.Info().Name,
+							Status:         StatusZipping,
+							Progress:       progress,
+							Speed:          "-",
+							ETA:            "--:--",
+							TotalSize:      totalByte,
+							BytesCompleted: readByte,
+							UserID:         taskToProcess.Request.UserID,
+						})
 					}
 					if err = upload.ZipFolder(originalPath, zipPath, wm, calculateZipProgress); err != nil {
 						log.Printf("Error creating zip for %s: %v", infoHash, err)

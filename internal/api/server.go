@@ -12,6 +12,7 @@ import (
 	"github.com/plutack/seedrlike/internal/api/handlers"
 	"github.com/plutack/seedrlike/internal/core/client"
 	"github.com/plutack/seedrlike/internal/core/queue"
+	"github.com/plutack/seedrlike/internal/core/search"
 	ws "github.com/plutack/seedrlike/internal/core/websocket"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
 	"github.com/plutack/seedrlike/views/assets"
@@ -52,6 +53,13 @@ func (s *Server) registerRoutes() {
 
 	d := handlers.NewDownloadHandler(s.queue)
 	authHandler := handlers.NewAuthHandler(s.dbQueries)
+	// Search talks to the external torrengo service (TORRENGO_URL, default
+	// http://localhost:8080). Credentials must match torrengo's.
+	searchHandler := handlers.NewSearchHandler(search.New(
+		os.Getenv("TORRENGO_URL"),
+		os.Getenv("TORRENGO_USERNAME"),
+		os.Getenv("TORRENGO_PASSWORD"),
+	))
 
 	apiRouter.HandleFunc("/login", authHandler.LoginPage).Methods(GetMethod)
 	apiRouter.HandleFunc("/login", authHandler.Login).Methods(PostMethod)
@@ -60,6 +68,7 @@ func (s *Server) registerRoutes() {
 	apiRouter.HandleFunc("/logout", authHandler.Logout).Methods(PostMethod)
 
 	apiRouter.HandleFunc("/", handlers.GetTorrentsFromDBHomepage(s.dbQueries, s.rootFolderID)).Methods(GetMethod)
+	apiRouter.HandleFunc("/search", searchHandler.Search).Methods(GetMethod)
 	apiRouter.HandleFunc("/downloads", d.CreateNewDownload).Methods(PostMethod)
 	apiRouter.HandleFunc("/downloads/{ID}", d.StopDownload).Methods(DeleteMethod)
 	apiRouter.HandleFunc("/contents", handlers.DeleteStaleContentFromDB(s.dbQueries, s.gofileClient, s.db)).Methods(DeleteMethod)

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"strings"
 
@@ -57,55 +58,20 @@ func newNullString(s string) sql.NullString {
 	}
 }
 
-// Add this to the upload.go file to enable progress tracking during uploads
-
-// ProgressTrackingUploader handles upload progress reporting
+// ProgressTrackingUploader carries the identity needed to report upload
+// progress over the websocket.
 type ProgressTrackingUploader struct {
-	client          *api.Api
-	websocketMgr    *ws.WebsocketManager
-	torrentID       string  // InfoHash of the torrent
-	torrentName     string  // Name of the torrent
-	totalBytes      int64   // Total bytes to upload
-	totalUploaded   int64   // Running total of bytes uploaded
-	progressPercent float64 // Current progress percentage
-	userID          *string
+	websocketMgr *ws.WebsocketManager
+	torrentID    string // InfoHash of the torrent
+	torrentName  string // Name of the torrent
 }
 
-// NewProgressTrackingUploader creates a new upload tracker
-func NewProgressTrackingUploader(client *api.Api, wm *ws.WebsocketManager, id string, name string, totalSize int64, userID *string) *ProgressTrackingUploader {
+// NewProgressTrackingUploader creates a new upload tracker.
+func NewProgressTrackingUploader(wm *ws.WebsocketManager, id string, name string) *ProgressTrackingUploader {
 	return &ProgressTrackingUploader{
-		client:        client,
-		websocketMgr:  wm,
-		torrentID:     id,
-		torrentName:   name,
-		totalBytes:    totalSize,
-		totalUploaded: 0,
-		userID:        userID,
-	}
-}
-
-// UpdateProgress reports upload progress through the websocket
-func (u *ProgressTrackingUploader) UpdateProgress(bytesUploaded int64) {
-	u.totalUploaded += bytesUploaded
-	if u.totalBytes > 0 {
-		newProgress := float64(u.totalUploaded) * 100 / float64(u.totalBytes)
-		// Only send update if progress changed significantly (every 1%)
-		if int(newProgress) > int(u.progressPercent) {
-			u.progressPercent = newProgress
-			// Round to 2 decimal places
-			roundedProgress := math.Round(newProgress*100) / 100
-
-			u.websocketMgr.SendProgress(ws.TorrentUpdate{
-				Type:     "torrent update",
-				ID:       u.torrentID,
-				Name:     u.torrentName,
-				Status:   "uploading",
-				Progress: roundedProgress,
-				Speed:    "-",
-				ETA:      fmt.Sprintf("%.1f%%", roundedProgress),
-				UserID:   u.userID,
-			})
-		}
+		websocketMgr: wm,
+		torrentID:    id,
+		torrentName:  name,
 	}
 }
 
@@ -129,13 +95,7 @@ func SendTorrentToServerWithProgress(
 	torrentName string,
 	userID *string) error {
 
-	// Get total size for progress reporting
-	totalSize, err := getPathSize(folderPath)
-	if err != nil {
-		log.Printf("Failed to calculate size for progress tracking: %v", err)
-	}
-
-	tracker := NewProgressTrackingUploader(uploadClient, wm, hash, torrentName, totalSize, userID)
+	tracker := NewProgressTrackingUploader(wm, hash, torrentName)
 
 	tracker.websocketMgr.SendProgress(ws.TorrentUpdate{
 		Type:     "torrent update",
@@ -147,16 +107,25 @@ func SendTorrentToServerWithProgress(
 		ETA:      "starting upload...",
 		UserID:   userID,
 	})
+	var lastUploadEmit time.Time
 	callbackfunc := func(uploadedByte, totalByte int64) {
+		// Throttle to the shared broadcast cadence so uploads tick at the same
+		// rate as downloads (but always emit the final byte).
+		if time.Since(lastUploadEmit) < ws.ProgressBroadcastInterval && uploadedByte < totalByte {
+			return
+		}
+		lastUploadEmit = time.Now()
 		tracker.websocketMgr.SendProgress(ws.TorrentUpdate{
-			Type:     "torrent update",
-			ID:       tracker.torrentID,
-			Name:     tracker.torrentName,
-			Status:   "uploading",
-			Progress: returnPercentageCompleted(uploadedByte, totalByte),
-			Speed:    "-",
-			ETA:      "starting upload...",
-			UserID:   userID,
+			Type:           "torrent update",
+			ID:             tracker.torrentID,
+			Name:           tracker.torrentName,
+			Status:         "uploading",
+			Progress:       returnPercentageCompleted(uploadedByte, totalByte),
+			Speed:          "-",
+			ETA:            "uploading...",
+			TotalSize:      totalByte,
+			BytesCompleted: uploadedByte,
+			UserID:         userID,
 		})
 
 	}

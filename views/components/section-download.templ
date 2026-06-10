@@ -18,7 +18,7 @@ templ Download() {
 				hx-post="/downloads"
 				hx-target="#download-response"
 				hx-swap="innerHTML"
-				hx-on::after-request="if(event.detail.xhr.status === 200) { this.querySelector('input[name=magnet-link]').value=''; this.querySelector('input[name=magnet-link]').dispatchEvent(new Event('input')); }"
+				hx-on::after-request="if(event.detail.requestConfig.verb === 'post' && event.detail.xhr.status === 200) { this.querySelector('input[name=magnet-link]').value=''; this.querySelector('input[name=magnet-link]').dispatchEvent(new Event('input')); }"
 			>
 				<label class="input input-bordered flex items-center gap-2 w-full sm:flex-1 min-w-0">
 					<img
@@ -44,7 +44,14 @@ templ Download() {
 						class="grow min-w-0"
 						placeholder="Paste a magnet link or search…"
 						autocomplete="off"
+						hx-get="/search"
+						hx-trigger="keyup changed delay:500ms[this.value.trim().length >= 3]"
+						hx-target="#download-response"
+						hx-swap="innerHTML"
+						hx-sync="this:replace"
+						hx-indicator="#search-indicator"
 					/>
+					<span id="search-indicator" class="htmx-indicator loading loading-spinner loading-sm opacity-70"></span>
 				</label>
 				<!--
 					On mobile the input takes its own row; this group sits below it with the
@@ -62,18 +69,92 @@ templ Download() {
 							class="toggle toggle-primary toggle-sm"
 						/>
 					</label>
+					<!--
+						The Add button only applies to magnet links. In search mode the
+						input live-queries /search (debounced) and results render below
+						with their own per-row Add buttons, so this is hidden.
+					-->
 					<button
 						type="submit"
 						class="btn btn-primary px-6 sm:w-28"
+						x-show="!isSearch"
 						x-bind:disabled="!isMagnet"
-						x-text="isSearch ? 'Search' : 'Add'"
 					>Add</button>
 				</div>
 			</form>
+			<!--
+				Filter bar + results live in one Alpine scope. Filters run
+				client-side over the rendered rows (data-* attributes) so
+				toggling never re-queries the search service. apply() re-runs
+				after every HTMX swap so new results inherit the active filters.
+			-->
 			<div
-				id="download-response"
-				class="text-center mt-4 mx-auto max-w-2xl"
-			></div>
+				x-data="{
+					activeSources: { tpb: true, yts: true, nyaa: true, eztv: true },
+					minSeeders: 0,
+					sortBy: 'seeders',
+					hasRows: false,
+					rows() { return [...this.$root.querySelectorAll('.search-row')]; },
+					apply() {
+						const rows = this.rows();
+						this.hasRows = rows.length > 0;
+						rows.forEach(r => {
+							const ok = (this.activeSources[r.dataset.source] !== false)
+								&& parseInt(r.dataset.seeders || '0', 10) >= this.minSeeders;
+							r.style.display = ok ? '' : 'none';
+						});
+						const c = this.$root.querySelector('#search-results-list');
+						if (c) rows.sort((a, b) => this.cmp(a, b)).forEach(r => c.appendChild(r));
+					},
+					cmp(a, b) {
+						if (this.sortBy === 'size') return (+b.dataset.sizebytes) - (+a.dataset.sizebytes);
+						if (this.sortBy === 'name') return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+						return (+b.dataset.seeders) - (+a.dataset.seeders);
+					}
+				}"
+				@htmx:after-swap="apply()"
+			>
+				<div
+					x-show="isSearch && hasRows"
+					x-cloak
+					class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs sm:text-sm"
+				>
+					<div class="flex items-center gap-1.5">
+						<span class="text-base-content/60">Sources:</span>
+						<template x-for="s in ['tpb','yts','nyaa','eztv']" :key="s">
+							<button
+								type="button"
+								class="badge badge-sm cursor-pointer select-none"
+								x-bind:class="activeSources[s] ? 'badge-primary' : 'badge-ghost'"
+								x-text="s"
+								x-on:click="activeSources[s] = !activeSources[s]; apply()"
+							></button>
+						</template>
+					</div>
+					<label class="flex items-center gap-1.5">
+						<span class="text-base-content/60">Min seeders</span>
+						<input
+							type="number"
+							min="0"
+							x-model.number="minSeeders"
+							x-on:input="apply()"
+							class="input input-bordered input-xs w-16"
+						/>
+					</label>
+					<label class="flex items-center gap-1.5">
+						<span class="text-base-content/60">Sort</span>
+						<select x-model="sortBy" x-on:change="apply()" class="select select-bordered select-xs">
+							<option value="seeders">Seeders</option>
+							<option value="size">Size</option>
+							<option value="name">Name</option>
+						</select>
+					</label>
+				</div>
+				<div
+					id="download-response"
+					class="mt-4 mx-auto max-w-2xl"
+				></div>
+			</div>
 		</div>
 	</div>
 }

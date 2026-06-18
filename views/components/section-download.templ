@@ -60,9 +60,10 @@ templ Download() {
 					3rd char and hx-get the search API instead of disabling the button.
 				-->
 				<div class="flex items-center gap-2 justify-between sm:justify-end">
-					<label class="label cursor-pointer gap-2 px-1" x-show="!isSearch">
+					<label class="label cursor-pointer gap-2 px-1">
 						<span class="label-text text-sm">Zip</span>
 						<input
+							id="zip-toggle"
 							type="checkbox"
 							checked="checked"
 							name="is-zipped"

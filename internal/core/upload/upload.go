@@ -83,6 +83,38 @@ func returnPercentageCompleted(c, t int64) float64 {
 	return math.Round(percentage*100) / 100
 }
 
+func formatSpeed(bytesPerSec float64) string {
+	if bytesPerSec < 1024 {
+		return fmt.Sprintf("%.2f B/s", bytesPerSec)
+	}
+	value := bytesPerSec / 1024
+	if value < 1024 {
+		return fmt.Sprintf("%.2f KB/s", value)
+	}
+	return fmt.Sprintf("%.2f MB/s", value/1024.0)
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	} else if d < time.Hour {
+		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+// etaFromRate estimates remaining time given a byte rate.
+func etaFromRate(completed, total int64, bytesPerSec float64) string {
+	if total <= 0 || bytesPerSec <= 0 {
+		return "calculating..."
+	}
+	if completed >= total {
+		return "complete"
+	}
+	seconds := float64(total-completed) / bytesPerSec
+	return formatDuration(time.Duration(seconds) * time.Second)
+}
+
 // SendTorrentToServerWithProgress uploads a torrent to the server with progress tracking
 func SendTorrentToServerWithProgress(
 	folderPath string,
@@ -107,22 +139,37 @@ func SendTorrentToServerWithProgress(
 		ETA:      "starting upload...",
 		UserID:   userID,
 	})
-	var lastUploadEmit time.Time
+	var (
+		lastUploadEmit  time.Time
+		lastUploadBytes int64
+		uploadSampled   bool
+	)
 	callbackfunc := func(uploadedByte, totalByte int64) {
 		// Throttle to the shared broadcast cadence so uploads tick at the same
 		// rate as downloads (but always emit the final byte).
 		if time.Since(lastUploadEmit) < ws.ProgressBroadcastInterval && uploadedByte < totalByte {
 			return
 		}
+		speed := "-"
+		eta := "calculating..."
+		if uploadSampled {
+			if dt := time.Since(lastUploadEmit).Seconds(); dt > 0 {
+				bps := float64(uploadedByte-lastUploadBytes) / dt
+				speed = formatSpeed(bps)
+				eta = etaFromRate(uploadedByte, totalByte, bps)
+			}
+		}
 		lastUploadEmit = time.Now()
+		lastUploadBytes = uploadedByte
+		uploadSampled = true
 		tracker.websocketMgr.SendProgress(ws.TorrentUpdate{
 			Type:           "torrent update",
 			ID:             tracker.torrentID,
 			Name:           tracker.torrentName,
 			Status:         "uploading",
 			Progress:       returnPercentageCompleted(uploadedByte, totalByte),
-			Speed:          "-",
-			ETA:            "uploading...",
+			Speed:          speed,
+			ETA:            eta,
 			TotalSize:      totalByte,
 			BytesCompleted: uploadedByte,
 			UserID:         userID,

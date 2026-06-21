@@ -96,7 +96,9 @@ func New() (*Server, error) {
 
 	timeout := 0
 	retryCount := 2
+	apiToken := os.Getenv("GOFILE_API_KEY")
 	u := api.New(&api.Options{
+		APIToken:   &apiToken,
 		RetryCount: &retryCount,
 		Timeout:    &timeout,
 	})

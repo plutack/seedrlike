@@ -1,7 +1,7 @@
 GOOSE_DRIVER=mysql # see [goose documentation](https://pressly.github.io/goose/documentation/environment-variables/)
 GOOSE_DBSTRING="mysql:mysql@tcp(127.0.0.1:3306)/seedrlike"
 GOOSE_MIGRATION_DIR=./internal/database/migrations/ # this is constant use to initialize the database tables and recordsj
-gofile_api_key= <xxxxxxxxxxxxxxx> # see gofile.io for api key
+GOFILE_API_KEY= <xxxxxxxxxxxxxxx> # see gofile.io for api key
 JWT_SECRET= <change_me> # secret used to sign auth tokens
 ADMIN_USERNAME= <admin> # username allowed to wipe ALL stale content; others only clear their own
 TORRENTGO_URL=http://localhost:8080 # base URL of the torrentgo search microservice

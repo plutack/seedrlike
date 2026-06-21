@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/klauspost/compress v1.18.5
-	github.com/plutack/go-gofile v1.0.9
+	github.com/plutack/go-gofile v1.0.10
 	golang.org/x/crypto v0.38.0
 )
 

@@ -520,7 +520,11 @@ func (q *DownloadQueue) runTask(task *DownloadTask, t *torrent.Torrent, u *api.A
 			if task.Request.IsZipped {
 				zipPath := originalPath + ".zip"
 				log.Printf("Zipping folder %s to %s", originalPath, zipPath)
-				var lastZipEmit time.Time
+				var (
+					lastZipEmit  time.Time
+					lastZipBytes int64
+					zipSampled   bool
+				)
 				calculateZipProgress := func(readByte, totalByte int64) {
 					var progress float64 = 0
 					if totalByte > 0 {
@@ -535,15 +539,26 @@ func (q *DownloadQueue) runTask(task *DownloadTask, t *torrent.Torrent, u *api.A
 					if time.Since(lastZipEmit) < ws.ProgressBroadcastInterval && readByte < totalByte {
 						return
 					}
+					speed := "-"
+					eta := "calculating..."
+					if zipSampled {
+						if dt := time.Since(lastZipEmit).Seconds(); dt > 0 {
+							bps := float64(readByte-lastZipBytes) / dt
+							speed = formatSpeed(bps)
+							eta = etaFromRate(readByte, totalByte, bps)
+						}
+					}
 					lastZipEmit = time.Now()
+					lastZipBytes = readByte
+					zipSampled = true
 					wm.SendProgress(ws.TorrentUpdate{
 						Type:           "torrent update",
 						ID:             infoHash,
 						Name:           t.Info().Name,
 						Status:         StatusZipping,
 						Progress:       progress,
-						Speed:          "-",
-						ETA:            "--:--",
+						Speed:          speed,
+						ETA:            eta,
 						TotalSize:      totalByte,
 						BytesCompleted: readByte,
 						UserID:         task.Request.UserID,
@@ -724,6 +739,18 @@ func calculateETA(t *torrent.Torrent) string {
 	duration := time.Duration(seconds) * time.Second
 
 	return formatDuration(duration)
+}
+
+// etaFromRate estimates remaining time given a byte rate.
+func etaFromRate(completed, total int64, bytesPerSec float64) string {
+	if total <= 0 || bytesPerSec <= 0 {
+		return "calculating..."
+	}
+	if completed >= total {
+		return "complete"
+	}
+	seconds := float64(total-completed) / bytesPerSec
+	return formatDuration(time.Duration(seconds) * time.Second)
 }
 
 // formatSpeed converts bytes per second to human readable format

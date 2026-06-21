@@ -44,6 +44,10 @@ type (
 		Torrent *torrent.Torrent
 		Status  string
 		Size    int64
+		// reservedBytes is what this task counts for against the budget. Zipped
+		// tasks reserve double their size because the folder and the .zip
+		// coexist on disk during upload.
+		reservedBytes int64
 	}
 
 	DownloadQueue struct {
@@ -281,12 +285,16 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		task.ID = infoHash
 		task.Torrent = t
 		task.Size = t.Length()
-		log.Printf("Task %s (%s) updated with InfoHash ID, torrent object and size %.2f GB.", t.Info().Name, infoHash, float64(task.Size)/bytesPerGB)
+		task.reservedBytes = task.Size
+		if task.Request.IsZipped {
+			task.reservedBytes = task.Size * 2
+		}
+		log.Printf("Task %s (%s) updated with InfoHash ID, torrent object and size %.2f GB (reserving %.2f GB).", t.Info().Name, infoHash, float64(task.Size)/bytesPerGB, float64(task.reservedBytes)/bytesPerGB)
 		q.mu.Unlock()
 
-		// A torrent larger than the entire budget can never be scheduled.
-		if task.Size > q.maxActiveBytes {
-			log.Printf("Task %s size (%.2f GB) exceeds the max active download budget (%.2f GB). Rejecting.", infoHash, float64(task.Size)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
+		// A torrent that can never fit within the budget is rejected.
+		if task.reservedBytes > q.maxActiveBytes {
+			log.Printf("Task %s reservation (%.2f GB) exceeds the max active download budget (%.2f GB). Rejecting.", infoHash, float64(task.reservedBytes)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
 			t.Drop()
 			wm.SendProgress(ws.TorrentUpdate{
 				Type:     "torrent update",
@@ -314,9 +322,9 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				q.mu.Unlock()
 				break
 			}
-			if q.activeBytes+task.Size <= q.maxActiveBytes {
-				q.activeBytes += task.Size
-				log.Printf("Reserved %.2f GB for task %s (active: %.2f/%.0f GB)", float64(task.Size)/bytesPerGB, infoHash, float64(q.activeBytes)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
+			if q.activeBytes+task.reservedBytes <= q.maxActiveBytes {
+				q.activeBytes += task.reservedBytes
+				log.Printf("Reserved %.2f GB for task %s (active: %.2f/%.0f GB)", float64(task.reservedBytes)/bytesPerGB, infoHash, float64(q.activeBytes)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
 				q.mu.Unlock()
 				break
 			}
@@ -353,11 +361,11 @@ func (q *DownloadQueue) runTask(task *DownloadTask, t *torrent.Torrent, u *api.A
 
 	defer func() {
 		q.mu.Lock()
-		q.activeBytes -= task.Size
+		q.activeBytes -= task.reservedBytes
 		if q.activeBytes < 0 {
 			q.activeBytes = 0
 		}
-		log.Printf("Released %.2f GB from task %s (active: %.2f/%.0f GB)", float64(task.Size)/bytesPerGB, infoHash, float64(q.activeBytes)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
+		log.Printf("Released %.2f GB from task %s (active: %.2f/%.0f GB)", float64(task.reservedBytes)/bytesPerGB, infoHash, float64(q.activeBytes)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
 		q.mu.Unlock()
 	}()
 

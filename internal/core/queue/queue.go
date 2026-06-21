@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -28,6 +29,10 @@ const (
 	StatusZipping       = "zipping"
 	StatusStopped       = "stopped"
 	maxQueueSize        = 10 // TODO: implement a configuaration file
+
+	bytesPerGB           = 1 << 30
+	defaultMaxActiveGB   = 50
+	maxActiveDownloadEnv = "MAX_ACTIVE_DOWNLOAD_GB"
 )
 
 type (
@@ -38,11 +43,16 @@ type (
 		Request DownloadRequest
 		Torrent *torrent.Torrent
 		Status  string
+		Size    int64
 	}
 
 	DownloadQueue struct {
 		mu    sync.Mutex
 		tasks []*DownloadTask
+		// maxActiveBytes is the global budget shared across all users; downloads
+		// run concurrently until their combined size would exceed it.
+		maxActiveBytes int64
+		activeBytes    int64
 	}
 
 	DownloadRequest struct {
@@ -66,9 +76,22 @@ func NewDownloadTask(r DownloadRequest) *DownloadTask {
 	return t
 }
 
+func maxActiveBytesFromEnv() int64 {
+	gb := defaultMaxActiveGB
+	if v := os.Getenv(maxActiveDownloadEnv); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			gb = parsed
+		} else {
+			log.Printf("invalid %s value %q, falling back to %d GB", maxActiveDownloadEnv, v, defaultMaxActiveGB)
+		}
+	}
+	return int64(gb) * bytesPerGB
+}
+
 func New() *DownloadQueue {
 	return &DownloadQueue{
-		tasks: make([]*DownloadTask, 0, maxQueueSize),
+		tasks:          make([]*DownloadTask, 0, maxQueueSize),
+		maxActiveBytes: maxActiveBytesFromEnv(),
 	}
 }
 
@@ -165,35 +188,52 @@ func (q *DownloadQueue) removeTaskByID_unsafe(id string) {
 	q.tasks = newTasks
 }
 
+// removeTask_unsafe removes a task by pointer (must hold the mutex). Unlike
+// removeTaskByID_unsafe it works even before the task's ID has been set.
+func (q *DownloadQueue) removeTask_unsafe(target *DownloadTask) {
+	newTasks := make([]*DownloadTask, 0, len(q.tasks))
+	for _, task := range q.tasks {
+		if task != target {
+			newTasks = append(newTasks, task)
+		}
+	}
+	q.tasks = newTasks
+}
+
 func getFolderPath(folderName string) string {
 	return fmt.Sprintf("%s/%s", storagePath, folderName)
 }
+
+// ProcessTasks dispatches pending downloads. It fetches each torrent's
+// metadata, reserves space against the global byte budget, and then runs the
+// actual download concurrently via runTask. Tasks whose size would push the
+// active total over the budget wait until earlier downloads free up space.
 func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db *database.Queries, wm *ws.WebsocketManager) {
-	log.Println("Task processor started")
+	log.Printf("Task processor started (max active download budget: %.0f GB)", float64(q.maxActiveBytes)/bytesPerGB)
 	for {
-		var taskToProcess *DownloadTask
+		var task *DownloadTask
 
 		q.mu.Lock()
-		for i, task := range q.tasks {
-			if task.Status == StatusPending {
-				taskToProcess = task
+		for i, candidate := range q.tasks {
+			if candidate.Status == StatusPending {
+				task = candidate
 				task.Status = StatusStarted
-				log.Printf("Download for Task at index: %d for magnet link: %s started", i, taskToProcess.Request.MagnetLink)
+				log.Printf("Dispatching task at index: %d for magnet link: %s", i, task.Request.MagnetLink)
 				break
 			}
 		}
 		q.mu.Unlock()
-		if taskToProcess == nil {
+		if task == nil {
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		t, err := c.AddMagnet(taskToProcess.Request.MagnetLink)
+		t, err := c.AddMagnet(task.Request.MagnetLink)
 		if err != nil {
 			log.Println("error adding link to client for download")
 			q.mu.Lock()
-			taskToProcess.Status = StatusFailed
-			// remove here?
+			task.Status = StatusFailed
+			q.removeTask_unsafe(task)
 			q.mu.Unlock()
 			continue
 		}
@@ -207,9 +247,9 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			Progress: 0,
 			Speed:    "0",
 			ETA:      "calculating...",
-			UserID:   taskToProcess.Request.UserID,
+			UserID:   task.Request.UserID,
 		})
-		log.Printf("Waiting for torrent info for magnet link: %s", taskToProcess.Request.MagnetLink)
+		log.Printf("Waiting for torrent info for magnet link: %s", task.Request.MagnetLink)
 		infoCtx, cancelInfo := context.WithTimeout(context.Background(), 1*time.Minute)
 		select {
 		case <-t.GotInfo():
@@ -218,9 +258,6 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 			// torrent is probably dead
 			log.Printf("Torrent is no longer active")
 			t.Drop()
-			q.mu.Lock()
-			taskToProcess.Status = StatusFailed
-			// remove task here too
 			wm.SendProgress(ws.TorrentUpdate{
 				Type:     "torrent update",
 				ID:       t.InfoHash().String(),
@@ -229,8 +266,11 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 				Progress: 0,
 				Speed:    "0",
 				ETA:      "--:--",
-				UserID:   taskToProcess.Request.UserID,
+				UserID:   task.Request.UserID,
 			})
+			q.mu.Lock()
+			task.Status = StatusFailed
+			q.removeTask_unsafe(task)
 			q.mu.Unlock()
 			cancelInfo()
 			continue
@@ -238,307 +278,381 @@ func ProcessTasks(c *torrent.Client, q *DownloadQueue, u *api.Api, r string, db 
 		cancelInfo()
 		infoHash := t.InfoHash().String()
 		q.mu.Lock()
-		taskToProcess.ID = infoHash
-		taskToProcess.Torrent = t
-		log.Printf("Task %s (%s) updated with InfoHash ID and torrent object.", t.Info().Name, infoHash)
+		task.ID = infoHash
+		task.Torrent = t
+		task.Size = t.Length()
+		log.Printf("Task %s (%s) updated with InfoHash ID, torrent object and size %.2f GB.", t.Info().Name, infoHash, float64(task.Size)/bytesPerGB)
 		q.mu.Unlock()
 
-		// Start download
-		t.DownloadAll()
-		log.Printf("%s started downloading", t.Info().Name)
-		t.DisallowDataUpload()
-
-		// Channel to stop Goroutines once complete
-		stopChan := make(chan struct{})
-
-		// Start Goroutine for speed and ETA updates
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-
-		go func(currentTask *DownloadTask) {
-			defer wg.Done()
-			ticker := time.NewTicker(ws.ProgressBroadcastInterval)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-stopChan:
-					log.Printf("Stopping progress updates for %s", currentTask.ID)
-					return
-				case <-ticker.C:
-					q.mu.Lock()
-					currentStatus := currentTask.Status
-					q.mu.Unlock()
-					if currentStatus != StatusStarted && currentStatus != StatusDownloading {
-						log.Printf("Task %s status changed to %s, stopping progress updates.", currentTask.ID, currentStatus)
-						return // Exit if task status changed externally (e.g., stopped)
-					}
-					torrentHandle := currentTask.Torrent
-					if torrentHandle.Info() == nil {
-						log.Printf("Torrent info not yet available for progress update %s", currentTask.ID)
-						continue
-					}
-
-					speed := getDownloadSpeed(torrentHandle, 1*time.Second) // Shorter duration for calculation?
-					eta := calculateETA(torrentHandle)
-					completed := torrentHandle.BytesCompleted()
-					total := torrentHandle.Length()
-					progress := returnPercentageCompleted(completed, total)
-
-					q.mu.Lock()
-					// Only update to Downloading if it was Started
-					if currentTask.Status == StatusStarted {
-						currentTask.Status = StatusDownloading
-					}
-					q.mu.Unlock()
-					wm.SendProgress(ws.TorrentUpdate{
-						Type:           "torrent update",
-						ID:             currentTask.ID,
-						Name:           torrentHandle.Info().Name,
-						Status:         StatusDownloading,
-						Progress:       progress,
-						Speed:          speed,
-						ETA:            eta,
-						TotalSize:      total,
-						BytesCompleted: completed,
-						UserID:         currentTask.Request.UserID,
-					})
-				}
-			}
-		}(taskToProcess)
-
-		// Wait until torrent is complete
-		for !t.Complete().Bool() {
-			q.mu.Lock()
-			currentStatus := taskToProcess.Status
-			q.mu.Unlock()
-			if currentStatus == StatusStopped {
-				log.Printf("Download loop interrupted for %s because status is %s", infoHash, currentStatus)
-				break
-			}
-			time.Sleep(1 * time.Second)
-		}
-
-		// Stop the update Goroutine
-		log.Printf("Download loop finished/interrupted for %s. Closing stopChan.", infoHash)
-		close(stopChan)
-		wg.Wait()
-		log.Printf("Progress update goroutine finished for %s.", infoHash)
-
-		nextPhase := StatusNextPhase
-		// Check if it was stopped externally (implement Stop method later)
-		q.mu.Lock()
-		if taskToProcess.Status == StatusStopped {
-			nextPhase = StatusStopped
-			log.Printf("Task %s marked as Stopped.", infoHash)
-		} else if !t.Complete().Bool() {
-			// It exited the loop but isn't complete and wasn't stopped -> Failed?
-			nextPhase = StatusFailed
-			log.Printf("Task %s exited download loop but is not complete and not stopped. Marking as Failed.", infoHash)
-		} else {
-			log.Printf("Task %s completed successfully.", infoHash)
-		}
-		taskToProcess.Status = nextPhase
-		q.mu.Unlock()
-
-		// Send final websocket update based on status
-		wm.SendProgress(ws.TorrentUpdate{
-			Type:     "torrent update",
-			ID:       infoHash,
-			Name:     t.Info().Name,
-			Status:   nextPhase,                                                 // completed, failed, stopped
-			Progress: returnPercentageCompleted(t.BytesCompleted(), t.Length()), // Use final progress
-			Speed:    "0",
-			ETA:      "--:--", // "completed", "failed", "stopped"
-			UserID:   taskToProcess.Request.UserID,
-		})
-
-		log.Printf("Dropping torrent client state for %s", infoHash)
-		t.Drop() // Essential cleanup
-
-		// Determine paths before checking status for upload
-		originalPath := ""   // Initialize
-		if t.Info() != nil { // Make sure info is available
-			originalPath = getFolderPath(t.Info().Name)
-		} else {
-			log.Printf("Warning: Cannot determine originalPath for cleanup as torrent info is nil for task %s", infoHash)
-		}
-		uploadPath := originalPath
-
-		//  Upload and Cleanup (only if completed successfully or stopped)
-		if nextPhase == StatusNextPhase {
-			log.Printf("Starting upload/cleanup for completed task %s", infoHash)
+		// A torrent larger than the entire budget can never be scheduled.
+		if task.Size > q.maxActiveBytes {
+			log.Printf("Task %s size (%.2f GB) exceeds the max active download budget (%.2f GB). Rejecting.", infoHash, float64(task.Size)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
+			t.Drop()
 			wm.SendProgress(ws.TorrentUpdate{
 				Type:     "torrent update",
 				ID:       infoHash,
 				Name:     t.Info().Name,
-				Status:   StatusUploading,
-				Progress: 0.00,
+				Status:   StatusFailed,
+				Progress: 0,
 				Speed:    "0",
-				ETA:      "uploading...",
-				UserID:   taskToProcess.Request.UserID,
+				ETA:      "--:--",
+				UserID:   task.Request.UserID,
 			})
-			availableServerInfo, err := u.GetAvailableServers("eu")
-			if err != nil {
-				log.Printf("Error getting Gofile server for %s: %v. Skipping upload.", infoHash, err)
-				// Update status to Failed? Or add a new "UploadFailed" status? not likely to happen though
-				q.mu.Lock()
-				taskToProcess.Status = StatusFailed // Mark as failed if server fetch fails
+			q.mu.Lock()
+			task.Status = StatusFailed
+			q.removeTask_unsafe(task)
+			q.mu.Unlock()
+			continue
+		}
+
+		// Block until the global budget has room for this torrent.
+		stopped := false
+		for {
+			q.mu.Lock()
+			if task.Status == StatusStopped {
+				stopped = true
 				q.mu.Unlock()
-				// TODO: cleanup? and continue to eliminate nested else/ifs
-			} else {
-				euServer := availableServerInfo.Data.Servers[0].Name // TODO: create a function to randomize server selection
-				fmt.Printf("selected server:%s", euServer)
-				uploadPath = originalPath
+				break
+			}
+			if q.activeBytes+task.Size <= q.maxActiveBytes {
+				q.activeBytes += task.Size
+				log.Printf("Reserved %.2f GB for task %s (active: %.2f/%.0f GB)", float64(task.Size)/bytesPerGB, infoHash, float64(q.activeBytes)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
+				q.mu.Unlock()
+				break
+			}
+			q.mu.Unlock()
+			time.Sleep(2 * time.Second)
+		}
+		if stopped {
+			log.Printf("Task %s stopped while waiting for download budget.", infoHash)
+			t.Drop()
+			wm.SendProgress(ws.TorrentUpdate{
+				Type:     "torrent update",
+				ID:       infoHash,
+				Name:     t.Info().Name,
+				Status:   StatusStopped,
+				Progress: 0,
+				Speed:    "0",
+				ETA:      "--:--",
+				UserID:   task.Request.UserID,
+			})
+			q.mu.Lock()
+			q.removeTask_unsafe(task)
+			q.mu.Unlock()
+			continue
+		}
 
-				if taskToProcess.Request.IsZipped {
-					zipPath := originalPath + ".zip"
-					log.Printf("Zipping folder %s to %s", originalPath, zipPath)
-					var lastZipEmit time.Time
-					calculateZipProgress := func(readByte, totalByte int64) {
-						var progress float64 = 0
-						if totalByte > 0 {
-							progress = float64(readByte) * 100 / float64(totalByte)
-						}
+		go q.runTask(task, t, u, r, db, wm)
+	}
+}
 
-						// Round to 2 decimal places
-						progress = math.Round(progress*100) / 100
+// runTask performs the download, upload and cleanup for a single task whose
+// budget has already been reserved, releasing that budget when it returns.
+func (q *DownloadQueue) runTask(task *DownloadTask, t *torrent.Torrent, u *api.Api, r string, db *database.Queries, wm *ws.WebsocketManager) {
+	infoHash := task.ID
 
-						// Throttle to the shared broadcast cadence (but always
-						// emit the final byte so it doesn't stall short of 100%).
-						if time.Since(lastZipEmit) < ws.ProgressBroadcastInterval && readByte < totalByte {
-							return
-						}
-						lastZipEmit = time.Now()
-						wm.SendProgress(ws.TorrentUpdate{
-							Type:           "torrent update",
-							ID:             infoHash,
-							Name:           t.Info().Name,
-							Status:         StatusZipping,
-							Progress:       progress,
-							Speed:          "-",
-							ETA:            "--:--",
-							TotalSize:      totalByte,
-							BytesCompleted: readByte,
-							UserID:         taskToProcess.Request.UserID,
-						})
-					}
-					if err = upload.ZipFolder(originalPath, zipPath, wm, calculateZipProgress); err != nil {
-						log.Printf("Error creating zip for %s: %v", infoHash, err)
-						q.mu.Lock()
-						taskToProcess.Status = StatusFailed // Mark as failed if zip fails
-						q.mu.Unlock()
-						nextPhase = StatusFailed
-						wm.SendProgress(ws.TorrentUpdate{
-							Type:     "torrent update",
-							ID:       infoHash,
-							Name:     t.Info().Name,
-							Status:   nextPhase,
-							Progress: 0,
-							Speed:    "-",
-							ETA:      "--:--",
-							UserID:   taskToProcess.Request.UserID,
-						})
-					} else {
-						uploadPath = zipPath
-						wm.SendProgress(ws.TorrentUpdate{
-							Type:     "torrent update",
-							ID:       infoHash,
-							Name:     t.Info().Name,
-							Status:   StatusNextPhase,
-							Progress: 0,
-							Speed:    "-",
-							ETA:      "--:--",
-							UserID:   taskToProcess.Request.UserID,
-						})
-					}
+	defer func() {
+		q.mu.Lock()
+		q.activeBytes -= task.Size
+		if q.activeBytes < 0 {
+			q.activeBytes = 0
+		}
+		log.Printf("Released %.2f GB from task %s (active: %.2f/%.0f GB)", float64(task.Size)/bytesPerGB, infoHash, float64(q.activeBytes)/bytesPerGB, float64(q.maxActiveBytes)/bytesPerGB)
+		q.mu.Unlock()
+	}()
+
+	// Start download
+	t.DownloadAll()
+	log.Printf("%s started downloading", t.Info().Name)
+	t.DisallowDataUpload()
+
+	// Channel to stop Goroutines once complete
+	stopChan := make(chan struct{})
+
+	// Start Goroutine for speed and ETA updates
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func(currentTask *DownloadTask) {
+		defer wg.Done()
+		ticker := time.NewTicker(ws.ProgressBroadcastInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopChan:
+				log.Printf("Stopping progress updates for %s", currentTask.ID)
+				return
+			case <-ticker.C:
+				q.mu.Lock()
+				currentStatus := currentTask.Status
+				q.mu.Unlock()
+				if currentStatus != StatusStarted && currentStatus != StatusDownloading {
+					log.Printf("Task %s status changed to %s, stopping progress updates.", currentTask.ID, currentStatus)
+					return // Exit if task status changed externally (e.g., stopped)
 				}
-				// Proceed with upload only if zip didn't fail (or wasn't requested)
-				if nextPhase == StatusNextPhase {
-					log.Printf("Uploading %s to Gofile server %s", uploadPath, euServer)
+				torrentHandle := currentTask.Torrent
+				if torrentHandle.Info() == nil {
+					log.Printf("Torrent info not yet available for progress update %s", currentTask.ID)
+					continue
+				}
+
+				speed := getDownloadSpeed(torrentHandle, 1*time.Second) // Shorter duration for calculation?
+				eta := calculateETA(torrentHandle)
+				completed := torrentHandle.BytesCompleted()
+				total := torrentHandle.Length()
+				progress := returnPercentageCompleted(completed, total)
+
+				q.mu.Lock()
+				// Only update to Downloading if it was Started
+				if currentTask.Status == StatusStarted {
+					currentTask.Status = StatusDownloading
+				}
+				q.mu.Unlock()
+				wm.SendProgress(ws.TorrentUpdate{
+					Type:           "torrent update",
+					ID:             currentTask.ID,
+					Name:           torrentHandle.Info().Name,
+					Status:         StatusDownloading,
+					Progress:       progress,
+					Speed:          speed,
+					ETA:            eta,
+					TotalSize:      total,
+					BytesCompleted: completed,
+					UserID:         currentTask.Request.UserID,
+				})
+			}
+		}
+	}(task)
+
+	// Wait until torrent is complete
+	for !t.Complete().Bool() {
+		q.mu.Lock()
+		currentStatus := task.Status
+		q.mu.Unlock()
+		if currentStatus == StatusStopped {
+			log.Printf("Download loop interrupted for %s because status is %s", infoHash, currentStatus)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	// Stop the update Goroutine
+	log.Printf("Download loop finished/interrupted for %s. Closing stopChan.", infoHash)
+	close(stopChan)
+	wg.Wait()
+	log.Printf("Progress update goroutine finished for %s.", infoHash)
+
+	nextPhase := StatusNextPhase
+	// Check if it was stopped externally (implement Stop method later)
+	q.mu.Lock()
+	if task.Status == StatusStopped {
+		nextPhase = StatusStopped
+		log.Printf("Task %s marked as Stopped.", infoHash)
+	} else if !t.Complete().Bool() {
+		// It exited the loop but isn't complete and wasn't stopped -> Failed?
+		nextPhase = StatusFailed
+		log.Printf("Task %s exited download loop but is not complete and not stopped. Marking as Failed.", infoHash)
+	} else {
+		log.Printf("Task %s completed successfully.", infoHash)
+	}
+	task.Status = nextPhase
+	q.mu.Unlock()
+
+	// Send final websocket update based on status
+	wm.SendProgress(ws.TorrentUpdate{
+		Type:     "torrent update",
+		ID:       infoHash,
+		Name:     t.Info().Name,
+		Status:   nextPhase,                                                 // completed, failed, stopped
+		Progress: returnPercentageCompleted(t.BytesCompleted(), t.Length()), // Use final progress
+		Speed:    "0",
+		ETA:      "--:--", // "completed", "failed", "stopped"
+		UserID:   task.Request.UserID,
+	})
+
+	log.Printf("Dropping torrent client state for %s", infoHash)
+	t.Drop() // Essential cleanup
+
+	// Determine paths before checking status for upload
+	originalPath := ""   // Initialize
+	if t.Info() != nil { // Make sure info is available
+		originalPath = getFolderPath(t.Info().Name)
+	} else {
+		log.Printf("Warning: Cannot determine originalPath for cleanup as torrent info is nil for task %s", infoHash)
+	}
+	uploadPath := originalPath
+
+	//  Upload and Cleanup (only if completed successfully or stopped)
+	if nextPhase == StatusNextPhase {
+		log.Printf("Starting upload/cleanup for completed task %s", infoHash)
+		wm.SendProgress(ws.TorrentUpdate{
+			Type:     "torrent update",
+			ID:       infoHash,
+			Name:     t.Info().Name,
+			Status:   StatusUploading,
+			Progress: 0.00,
+			Speed:    "0",
+			ETA:      "uploading...",
+			UserID:   task.Request.UserID,
+		})
+		availableServerInfo, err := u.GetAvailableServers("eu")
+		if err != nil {
+			log.Printf("Error getting Gofile server for %s: %v. Skipping upload.", infoHash, err)
+			// Update status to Failed? Or add a new "UploadFailed" status? not likely to happen though
+			q.mu.Lock()
+			task.Status = StatusFailed // Mark as failed if server fetch fails
+			q.mu.Unlock()
+			// TODO: cleanup? and continue to eliminate nested else/ifs
+		} else {
+			euServer := availableServerInfo.Data.Servers[0].Name // TODO: create a function to randomize server selection
+			fmt.Printf("selected server:%s", euServer)
+			uploadPath = originalPath
+
+			if task.Request.IsZipped {
+				zipPath := originalPath + ".zip"
+				log.Printf("Zipping folder %s to %s", originalPath, zipPath)
+				var lastZipEmit time.Time
+				calculateZipProgress := func(readByte, totalByte int64) {
+					var progress float64 = 0
+					if totalByte > 0 {
+						progress = float64(readByte) * 100 / float64(totalByte)
+					}
+
+					// Round to 2 decimal places
+					progress = math.Round(progress*100) / 100
+
+					// Throttle to the shared broadcast cadence (but always
+					// emit the final byte so it doesn't stall short of 100%).
+					if time.Since(lastZipEmit) < ws.ProgressBroadcastInterval && readByte < totalByte {
+						return
+					}
+					lastZipEmit = time.Now()
+					wm.SendProgress(ws.TorrentUpdate{
+						Type:           "torrent update",
+						ID:             infoHash,
+						Name:           t.Info().Name,
+						Status:         StatusZipping,
+						Progress:       progress,
+						Speed:          "-",
+						ETA:            "--:--",
+						TotalSize:      totalByte,
+						BytesCompleted: readByte,
+						UserID:         task.Request.UserID,
+					})
+				}
+				if err = upload.ZipFolder(originalPath, zipPath, wm, calculateZipProgress); err != nil {
+					log.Printf("Error creating zip for %s: %v", infoHash, err)
+					q.mu.Lock()
+					task.Status = StatusFailed // Mark as failed if zip fails
+					q.mu.Unlock()
+					nextPhase = StatusFailed
 					wm.SendProgress(ws.TorrentUpdate{
 						Type:     "torrent update",
 						ID:       infoHash,
 						Name:     t.Info().Name,
-						Status:   StatusUploading,
+						Status:   nextPhase,
 						Progress: 0,
 						Speed:    "-",
-						ETA:      "uploading...",
-						UserID:   taskToProcess.Request.UserID,
+						ETA:      "--:--",
+						UserID:   task.Request.UserID,
 					})
-					err = upload.SendTorrentToServerWithProgress(uploadPath, u, r, euServer, infoHash, db, wm, t.Info().Name, taskToProcess.Request.UserID)
-					if err != nil {
-						log.Printf("Failed to upload %s to gofile for %s: %s", uploadPath, infoHash, err)
-						nextPhase = StatusFailed
-						q.mu.Lock()
-						taskToProcess.Status = nextPhase
-						q.mu.Unlock()
-						wm.SendProgress(ws.TorrentUpdate{
-							Type:     "torrent update",
-							ID:       infoHash,
-							Name:     t.Info().Name,
-							Status:   StatusFailed,
-							Progress: 0,
-							Speed:    "-",
-							ETA:      "--:--",
-							UserID:   taskToProcess.Request.UserID,
-						})
-					} else {
-						log.Printf("Upload successful for %s", infoHash)
-						nextPhase = StatusTaskCompleted
-						q.mu.Lock()
-						taskToProcess.Status = nextPhase
-						q.mu.Unlock()
-						wm.SendProgress(ws.TorrentUpdate{
-							Type:     "torrent update",
-							ID:       infoHash,
-							Name:     t.Info().Name,
-							Status:   nextPhase,
-							Progress: 100,
-							Speed:    "-",
-							ETA:      "--:--",
-							UserID:   taskToProcess.Request.UserID,
-						})
-						wm.SendProgress(ws.RefreshUpdate{ // Send refresh only on successful upload
-							Type:    "upload refresh",
-							Message: "content uploaded on gofile",
-						})
-					}
+				} else {
+					uploadPath = zipPath
+					wm.SendProgress(ws.TorrentUpdate{
+						Type:     "torrent update",
+						ID:       infoHash,
+						Name:     t.Info().Name,
+						Status:   StatusNextPhase,
+						Progress: 0,
+						Speed:    "-",
+						ETA:      "--:--",
+						UserID:   task.Request.UserID,
+					})
 				}
 			}
-		} // End if StatusCompleted for upload
-
-		// Cleanup downloaded files
-		if originalPath != "" { // Only attempt removal if path was determined
-			log.Printf("Removing downloaded file/folder: %s", originalPath)
-			errRemoveOrig := os.RemoveAll(originalPath)
-			if errRemoveOrig != nil {
-				log.Printf("Failed to delete original path %s for task %s: %s", originalPath, infoHash, errRemoveOrig)
-			}
-
-			// If zipped, also remove the zip file if it exists and is different from original
-			if taskToProcess.Request.IsZipped && uploadPath == originalPath+".zip" {
-				log.Printf("Removing zip file: %s", uploadPath)
-				errRemoveZip := os.RemoveAll(uploadPath)
-				if errRemoveZip != nil {
-					log.Printf("Failed to delete zip path %s for task %s: %s", uploadPath, infoHash, errRemoveZip)
+			// Proceed with upload only if zip didn't fail (or wasn't requested)
+			if nextPhase == StatusNextPhase {
+				log.Printf("Uploading %s to Gofile server %s", uploadPath, euServer)
+				wm.SendProgress(ws.TorrentUpdate{
+					Type:     "torrent update",
+					ID:       infoHash,
+					Name:     t.Info().Name,
+					Status:   StatusUploading,
+					Progress: 0,
+					Speed:    "-",
+					ETA:      "uploading...",
+					UserID:   task.Request.UserID,
+				})
+				err = upload.SendTorrentToServerWithProgress(uploadPath, u, r, euServer, infoHash, db, wm, t.Info().Name, task.Request.UserID)
+				if err != nil {
+					log.Printf("Failed to upload %s to gofile for %s: %s", uploadPath, infoHash, err)
+					nextPhase = StatusFailed
+					q.mu.Lock()
+					task.Status = nextPhase
+					q.mu.Unlock()
+					wm.SendProgress(ws.TorrentUpdate{
+						Type:     "torrent update",
+						ID:       infoHash,
+						Name:     t.Info().Name,
+						Status:   StatusFailed,
+						Progress: 0,
+						Speed:    "-",
+						ETA:      "--:--",
+						UserID:   task.Request.UserID,
+					})
+				} else {
+					log.Printf("Upload successful for %s", infoHash)
+					nextPhase = StatusTaskCompleted
+					q.mu.Lock()
+					task.Status = nextPhase
+					q.mu.Unlock()
+					wm.SendProgress(ws.TorrentUpdate{
+						Type:     "torrent update",
+						ID:       infoHash,
+						Name:     t.Info().Name,
+						Status:   nextPhase,
+						Progress: 100,
+						Speed:    "-",
+						ETA:      "--:--",
+						UserID:   task.Request.UserID,
+					})
+					wm.SendProgress(ws.RefreshUpdate{ // Send refresh only on successful upload
+						Type:    "upload refresh",
+						Message: "content uploaded on gofile",
+					})
 				}
 			}
 		}
-		//  End of cleanup process
+	} // End if StatusCompleted for upload
 
-		// Remove the task from the main queue slice
-		q.mu.Lock()
-		log.Printf("Attempting final removal of task %s from queue slice", infoHash)
-		q.removeTaskByID_unsafe(infoHash) // Remove by ID now that it's processed
-		log.Printf("Current queue length after removal attempt: %d", len(q.tasks))
-		q.mu.Unlock()
-		//  Task removed
+	// Cleanup downloaded files
+	if originalPath != "" { // Only attempt removal if path was determined
+		log.Printf("Removing downloaded file/folder: %s", originalPath)
+		errRemoveOrig := os.RemoveAll(originalPath)
+		if errRemoveOrig != nil {
+			log.Printf("Failed to delete original path %s for task %s: %s", originalPath, infoHash, errRemoveOrig)
+		}
 
-		log.Printf("Finished processing task %s with final status %s", infoHash, nextPhase)
-		// The loop will now continue to find the next pending task
-
+		// If zipped, also remove the zip file if it exists and is different from original
+		if task.Request.IsZipped && uploadPath == originalPath+".zip" {
+			log.Printf("Removing zip file: %s", uploadPath)
+			errRemoveZip := os.RemoveAll(uploadPath)
+			if errRemoveZip != nil {
+				log.Printf("Failed to delete zip path %s for task %s: %s", uploadPath, infoHash, errRemoveZip)
+			}
+		}
 	}
+	//  End of cleanup process
+
+	// Remove the task from the main queue slice
+	q.mu.Lock()
+	log.Printf("Attempting final removal of task %s from queue slice", infoHash)
+	q.removeTask_unsafe(task)
+	log.Printf("Current queue length after removal attempt: %d", len(q.tasks))
+	q.mu.Unlock()
+
+	log.Printf("Finished processing task %s with final status %s", infoHash, nextPhase)
 }
 
 func getDownloadSpeed(t *torrent.Torrent, duration time.Duration) string {

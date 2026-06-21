@@ -7,3 +7,4 @@ ADMIN_USERNAME= <admin> # username allowed to wipe ALL stale content; others onl
 TORRENTGO_URL=http://localhost:8080 # base URL of the torrentgo search microservice
 TORRENTGO_USERNAME=torrentgo # must match USERNAME on the torrentgo service
 TORRENTGO_PASSWORD=change-me # must match PASSWORD on the torrentgo service
+MAX_ACTIVE_DOWNLOAD_GB=50 # global budget (across all users) for concurrent downloads; torrents larger than this are rejected, the rest queue until space frees up

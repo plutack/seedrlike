@@ -1,0 +1,31 @@
+package layouts
+
+import "github.com/plutack/seedrlike/views/components"
+
+templ SettingsPage(title string, loggedIn bool, content templ.Component) {
+ <!DOCTYPE html>
+ <html lang="en" class="h-full" data-theme="nord">
+  <head>
+   <meta charset="UTF-8"/>
+   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+   <meta name="referrer" content="no-referrer"/>
+   <title>{ title } | Seedrlike</title>
+   <link rel="icon" type="image/png" href="/assets/bird.png"/>
+   <link href="/assets/css/tailwind.css" rel="stylesheet"/>
+   <script defer src="/assets/js/htmx.min.js"></script>
+   <script defer src="/assets/js/alpine.min.js"></script>
+   <script>
+    (function () {
+     var t = localStorage.getItem("theme");
+     if (t !== "nord" && t !== "nord-dark") t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "nord-dark" : "nord";
+     document.documentElement.setAttribute("data-theme", t);
+    })();
+   </script>
+  </head>
+  <body class="min-h-screen flex flex-col antialiased bg-base-200">
+   @components.Header(loggedIn)
+   <main class="flex-grow">@content</main>
+   @components.Footer()
+  </body>
+ </html>
+}

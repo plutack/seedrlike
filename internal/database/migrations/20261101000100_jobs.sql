@@ -1,0 +1,28 @@
+-- +goose Up
+CREATE TABLE Download_Jobs (
+    ID VARCHAR(36) PRIMARY KEY,
+    Info_Hash VARCHAR(64) NOT NULL,
+    Magnet TEXT NOT NULL,
+    Name TEXT NOT NULL,
+    Status VARCHAR(32) NOT NULL,
+    Stage VARCHAR(32) NOT NULL,
+    User_ID VARCHAR(36) NOT NULL DEFAULT '',
+    Zipped BOOLEAN NOT NULL DEFAULT FALSE,
+    Selected_Files JSON NULL,
+    Size BIGINT NOT NULL DEFAULT 0,
+    Reserved BIGINT NOT NULL DEFAULT 0,
+    Created_At TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Updated_At TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY active_info_hash (Info_Hash)
+);
+CREATE TABLE Download_Metrics (
+    Day DATE NOT NULL,
+    Status VARCHAR(32) NOT NULL,
+    Jobs BIGINT NOT NULL DEFAULT 0,
+    Bytes BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (Day, Status)
+);
+
+-- +goose Down
+DROP TABLE Download_Metrics;
+DROP TABLE Download_Jobs;

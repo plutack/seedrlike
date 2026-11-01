@@ -58,14 +58,22 @@ templ SearchResults(results []search.Result, matchedQuery string, failed bool) {
 					</div>
 					<button
 						type="button"
-						class="btn btn-primary btn-xs flex-shrink-0"
+						class="btn btn-primary btn-xs flex-shrink-0 whitespace-nowrap"
 						hx-post="/downloads"
 						hx-target="#download-response"
 						hx-swap="innerHTML"
 						hx-vals={ addToQueueVals(r.Magnet) }
 					>
-						Add
+						Download all
 					</button>
+					<button
+						type="button"
+						class="btn btn-ghost btn-xs flex-shrink-0 whitespace-nowrap"
+						hx-post="/downloads/preview"
+						hx-target="#download-response"
+						hx-swap="innerHTML"
+						hx-vals={ addToQueueVals(r.Magnet) }
+					>Choose files</button>
 				</div>
 			}
 		</div>

@@ -21,14 +21,21 @@ func returnContentDeleteUrl(contentID, contentType string) string {
 }
 
 templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, folderID string, isLoggedIn bool) {
+	@DownloadListWithOptions(returnErr, torrents, folderID, isLoggedIn, LibraryOptionsFromContext(ctx))
+}
+
+templ DownloadListWithOptions(returnErr bool, torrents []database.GetFolderContentsRow, folderID string, isLoggedIn bool, options LibraryOptions) {
 	<div
 		id="content-list"
-		hx-get={ "/contents/" + folderID }
+		x-data="{ mutationError: '' }"
+		x-on:htmx:after-request.camel="if ($event.detail.requestConfig.verb.toLowerCase() === 'delete' && !$event.detail.successful) mutationError = 'Deletion could not be completed. Library records were preserved for unconfirmed deletions; some remote items may already have been removed. Please refresh and check before retrying.'"
+		hx-get={ options.FolderURL(folderID) }
 		hx-trigger="refresh from:body"
 		hx-target="this"
 		hx-swap="outerHTML"
 	>
 		<div class="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+			<div role="alert" class="alert alert-error mb-3" x-show="mutationError" x-cloak><span x-text="mutationError"></span></div>
 			<!-- Toolbar: breadcrumb + actions -->
 			<div class="flex flex-wrap items-center justify-between gap-3 mb-3">
 				<nav class="flex items-center gap-1.5 text-sm font-medium" aria-label="Breadcrumb">
@@ -44,7 +51,7 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 						class="btn btn-ghost btn-sm btn-square"
 						title="Refresh"
 						aria-label="Refresh"
-						hx-get={ "/contents/" + folderID }
+						hx-get={ options.FolderURL(folderID) }
 						hx-target="#content-list"
 						hx-swap="outerHTML"
 					>
@@ -55,7 +62,7 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 					if isLoggedIn {
 						<button
 							class="btn btn-outline btn-error btn-sm"
-							hx-delete="/contents"
+							hx-delete={ options.StaleDeleteURL(folderID) }
 							hx-target="#content-list"
 							hx-swap="outerHTML"
 						>
@@ -64,33 +71,82 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 					}
 				</div>
 			</div>
+			<form action={ templ.SafeURL("/contents/" + folderID) } method="get" hx-get={ "/contents/" + folderID } hx-target="#content-list" hx-swap="outerHTML" hx-push-url="true" class="flex flex-wrap items-end gap-3 mb-4" role="search" aria-label="Search your library">
+				<div class="flex-1 min-w-48">
+					<label for="library-query" class="block text-sm font-medium mb-1">Search library</label>
+					<input id="library-query" type="search" name="q" value={ options.Query } maxlength="200" placeholder="Find files and folders in your library" class="input input-bordered input-sm w-full"/>
+				</div>
+				<div>
+					<label for="library-sort" class="block text-sm font-medium mb-1">Sort by</label>
+					<select id="library-sort" name="sort" class="select select-bordered select-sm">
+						<option value="name" selected={ options.Sort == "name" }>Name</option>
+						<option value="size" selected={ options.Sort == "size" }>Size</option>
+						<option value="date" selected={ options.Sort == "date" }>Date added</option>
+					</select>
+				</div>
+				<div>
+					<label for="library-order" class="block text-sm font-medium mb-1">Order</label>
+					<select id="library-order" name="order" class="select select-bordered select-sm">
+						<option value="asc" selected={ options.Order == "asc" }>Ascending</option>
+						<option value="desc" selected={ options.Order == "desc" }>Descending</option>
+					</select>
+				</div>
+				<button type="submit" class="btn btn-primary btn-sm">Apply</button>
+			</form>
+			if options.Query != "" {
+				<div class="flex items-center justify-between gap-3 mb-3 text-sm" role="status">
+					<p>Library results for <strong>{ options.Query }</strong> · { fmt.Sprint(len(torrents)) } items. This searches your accessible files, not external torrents.</p>
+					<a href={ templ.SafeURL(options.ClearURL(folderID)) } hx-get={ options.ClearURL(folderID) } hx-target="#content-list" hx-swap="outerHTML" hx-push-url="true" class="link whitespace-nowrap">Clear search</a>
+				</div>
+			}
 			if returnErr {
 				<div role="alert" class="alert alert-error">
-					<span>Cannot fetch item</span>
+					<span>We couldn’t load your library. Try refreshing the list.</span>
 				</div>
 			} else if len(torrents) == 0 {
 				<div class="rounded-box border border-dashed border-base-300 bg-base-200/30 py-16 text-center text-base-content/60">
 					<svg class="w-10 h-10 mx-auto mb-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
 					</svg>
-					<p>This folder is empty</p>
+					if options.Query != "" {
+						<p>No library items match your search.</p>
+						<p class="text-sm mt-1">Try another name or clear the search to browse this folder.</p>
+					} else {
+						<p>This folder is empty</p>
+					}
 				</div>
 			} else {
 				<div
 					x-data="{
 						count: 0,
+						deleting: false,
+						deleteError: '',
 						sync() { this.count = this.$root.querySelectorAll('.row-check:checked').length; },
 						toggleAll(e) {
 							this.$root.querySelectorAll('.row-check').forEach(c => c.checked = e.target.checked);
 							this.sync();
 						},
-						deleteSelected() {
+						async deleteSelected() {
+							if (this.deleting) return;
 							const checked = [...this.$root.querySelectorAll('.row-check:checked')];
-							if (!checked.length) return;
-							if (!confirm('Delete ' + checked.length + ' item(s)?')) return;
-							Promise.all(checked.map(c =>
-								fetch('/contents/' + c.dataset.id + '?type=' + c.dataset.type, { method: 'DELETE' })
-							)).then(() => htmx.trigger('#content-list', 'refresh'));
+							if (!checked.length) { this.$refs.deleteDialog.close(); return; }
+							this.deleting = true;
+							this.deleteError = '';
+							let failed = 0;
+							for (const c of checked) {
+								try {
+									const response = await fetch('/contents/' + encodeURIComponent(c.dataset.id) + '?type=' + encodeURIComponent(c.dataset.type), { method: 'DELETE' });
+									if (response.ok) { c.checked = false; c.disabled = true; } else { failed++; }
+								} catch (_) { failed++; }
+							}
+							this.deleting = false;
+							this.sync();
+							if (failed) {
+								this.deleteError = failed + ' item(s) could not be deleted. They may no longer be available, or you may not have permission. Please try again.';
+							} else {
+								this.$refs.deleteDialog.close();
+								htmx.trigger('#content-list', 'refresh');
+							}
 						}
 					}"
 					class="rounded-box border border-base-300 bg-base-100 overflow-hidden shadow-sm"
@@ -102,8 +158,19 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 						class="flex items-center justify-between gap-3 px-4 py-2 bg-primary/10 border-b border-base-300 text-sm"
 					>
 						<span x-text="count + ' selected'" class="font-medium"></span>
-						<button class="btn btn-error btn-xs" x-on:click="deleteSelected()">Delete selected</button>
+						<button type="button" class="btn btn-error btn-xs" x-on:click="deleteError = ''; $refs.deleteDialog.showModal()">Delete selected</button>
 					</div>
+					<dialog x-ref="deleteDialog" class="modal modal-bottom sm:modal-middle" aria-labelledby="delete-selected-title" x-on:cancel="if (deleting) $event.preventDefault()">
+						<div class="modal-box">
+							<h3 id="delete-selected-title" class="font-semibold text-lg">Delete selected items?</h3>
+							<p class="py-3 text-sm text-base-content/80">This permanently removes <span class="font-medium" x-text="count"></span> selected item(s) and their contents. This cannot be undone.</p>
+							<p role="alert" class="text-error text-sm" x-show="deleteError" x-text="deleteError" x-cloak></p>
+							<div class="modal-action">
+								<button type="button" class="btn btn-ghost btn-sm" x-bind:disabled="deleting" x-on:click="$refs.deleteDialog.close(); htmx.trigger('#content-list', 'refresh')" autofocus>Cancel</button>
+								<button type="button" class="btn btn-error btn-sm" x-bind:disabled="deleting || count === 0" x-on:click="deleteSelected()" x-text="deleting ? 'Deleting...' : 'Delete items'">Delete items</button>
+							</div>
+						</div>
+					</dialog>
 					<!-- Column header -->
 					<div class="hidden sm:grid sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 px-4 py-2.5 border-b border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wide text-base-content/60">
 						<input type="checkbox" class="checkbox checkbox-sm" aria-label="Select all" x-on:change="toggleAll($event)"/>
@@ -131,8 +198,8 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 								}
 								if torrent.Type == "folder" {
 									<a
-										href={ templ.SafeURL("/contents/" + torrent.ID) }
-										hx-get={ "/contents/" + torrent.ID }
+										href={ templ.SafeURL(options.ClearURL(torrent.ID)) }
+										hx-get={ options.ClearURL(torrent.ID) }
 										hx-target="#content-list"
 										hx-swap="outerHTML"
 										hx-push-url="true"
@@ -170,7 +237,8 @@ templ DownloadList(returnErr bool, torrents []database.GetFolderContentsRow, fol
 										</svg>
 									</a>
 									<button
-										hx-delete={ returnContentDeleteUrl(torrent.ID, torrent.Type) }
+										disabled={ !isLoggedIn }
+										hx-delete={ options.DeleteURL(torrent.ID, torrent.Type, folderID) }
 										hx-target="#content-list"
 										hx-swap="outerHTML"
 										hx-on::htmx:afterRequest="htmx.trigger('#content-list', 'refresh')"

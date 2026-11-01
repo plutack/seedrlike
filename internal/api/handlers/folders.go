@@ -3,11 +3,12 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/plutack/go-gofile/api"
+	"github.com/plutack/go-gofile/model"
 	"github.com/plutack/seedrlike/internal/auth"
 	"github.com/plutack/seedrlike/internal/core/upload"
 	database "github.com/plutack/seedrlike/internal/database/sqlc"
@@ -33,14 +34,29 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 		if folderID == rootFolderID {
 			parentFolderID = upload.RootFolderPlaceholder
 		}
-		folderParams := database.GetFolderContentsParams{
-			ParentFolderID: parentFolderID,
-			FolderID:       folderID,
-			UserID:         userIDParam,
+		options, err := components.ParseLibraryOptions(r.URL.Query())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
+		r = r.WithContext(components.WithLibraryOptions(r.Context(), options))
+		if options.Query == "" && folderID != rootFolderID && folderID != upload.RootFolderPlaceholder {
+			folder, folderErr := queries.GetFolderByID(r.Context(), folderID)
+			if folderErr == sql.ErrNoRows || (folderErr == nil && folder.UserID.Valid && folder.UserID.String != userID) {
+				http.Error(w, "Folder not found", http.StatusNotFound)
+				return
+			}
+			if folderErr != nil {
+				http.Error(w, "Failed to fetch folder", http.StatusInternalServerError)
+				return
+			}
+		}
+		torrents, err := queries.GetLibraryContents(r.Context(), database.LibraryParams{
+			ParentFolderID: parentFolderID, FolderID: parentFolderID, UserID: userIDParam,
+			Query: options.Query, Sort: options.Sort, Order: options.Order,
+		})
 
-		log.Printf("calling get torrents with id: %s, parentFolderID: %s\n\n", folderID, parentFolderID)
+		slog.Debug("Fetching library contents", "operation", "list_library")
 
 		// htmx navigations want only the list fragment; a direct browser visit
 		// needs the full page (head/CSS/header) or it renders unstyled.
@@ -48,7 +64,7 @@ func GetTorrentsFromDB(queries *database.Queries, rootFolderID string) http.Hand
 		isHTMX := r.Header.Get("HX-Request") == "true"
 
 		if err != nil {
-			log.Printf("Error fetching folder contents: %v", err)
+			slog.Error("Library request failed", "operation", "list_library", "reason", "database_query_failed", "error_type", fmt.Sprintf("%T", err))
 			w.WriteHeader(http.StatusInternalServerError)
 			if isHTMX {
 				components.DownloadList(true, nil, folderID, userID != "").Render(r.Context(), w)
@@ -75,18 +91,25 @@ func GetTorrentsFromDBHomepage(queries *database.Queries, rootFolderID string) h
 			userIDParam = sql.NullString{String: userID, Valid: true}
 		}
 
-		var folderParams database.GetFolderContentsParams
-		rootFolderID = upload.RootFolderPlaceholder
-		folderParams = database.GetFolderContentsParams{
-			ParentFolderID: rootFolderID,
-			FolderID:       rootFolderID,
-			UserID:         userIDParam,
-		}
-		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
+		folderID := upload.RootFolderPlaceholder
+		options, err := components.ParseLibraryOptions(r.URL.Query())
 		if err != nil {
-			log.Printf("Error fetching folder contents: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		r = r.WithContext(components.WithLibraryOptions(r.Context(), options))
+		torrents, err := queries.GetLibraryContents(r.Context(), database.LibraryParams{
+			ParentFolderID: folderID, FolderID: folderID, UserID: userIDParam,
+			Query: options.Query, Sort: options.Sort, Order: options.Order,
+		})
+		if err != nil {
+			slog.Error("Library request failed", "operation", "list_library", "reason", "database_query_failed", "error_type", fmt.Sprintf("%T", err))
 			w.WriteHeader(http.StatusInternalServerError)
-			layouts.Base(true, nil, rootFolderID, userID != "").Render(r.Context(), w)
+			if r.Header.Get("HX-Request") == "true" {
+				components.DownloadList(true, nil, rootFolderID, userID != "").Render(r.Context(), w)
+			} else {
+				layouts.Base(true, nil, rootFolderID, userID != "").Render(r.Context(), w)
+			}
 			return
 		}
 
@@ -107,15 +130,58 @@ func DeleteContentFromDB(queries *database.Queries, gofileClient *api.Api, db *s
 		contentID := vars["ID"]
 		q := r.URL.Query()
 		contentType := q.Get("type")
-		fmt.Println(contentID)
-		// Delete from Gofile first
-		result, err := gofileClient.DeleteContent(contentID)
+		if userID == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if contentType != "file" && contentType != "folder" {
+			http.Error(w, "Invalid content type", http.StatusBadRequest)
+			return
+		}
+		if contentID == upload.RootFolderPlaceholder {
+			http.Error(w, "Cannot delete the library root", http.StatusForbidden)
+			return
+		}
+		user, err := queries.GetUserByID(r.Context(), userID)
 		if err != nil {
-			fmt.Printf("err: %s ", err)
+			http.Error(w, "Failed to resolve user", http.StatusInternalServerError)
+			return
+		}
+		owner, err := queries.GetLibraryContentOwner(r.Context(), contentID, contentType)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Content not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "Failed to resolve content owner", http.StatusInternalServerError)
+			return
+		}
+		if !auth.IsAdmin(user.Username) {
+			if !owner.Valid || owner.String != userID {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			if contentType == "folder" {
+				owned, err := queries.LibrarySubtreeOwned(r.Context(), contentID, userID)
+				if err != nil {
+					http.Error(w, "Failed to verify folder ownership", http.StatusInternalServerError)
+					return
+				}
+				if !owned {
+					http.Error(w, "Folder contains content owned by another user", http.StatusForbidden)
+					return
+				}
+			}
+		}
+		// Authorization must finish before any destructive remote request.
+		// Delete from Gofile first
+		err = deleteRemoteContentConfirmed(gofileClient, []string{contentID})
+		if err != nil {
+			slog.Error("Content deletion failed", "operation", "delete_content", "reason", "remote_delete_failed", "error_type", fmt.Sprintf("%T", err))
 			http.Error(w, "Failed to delete from Gofile", http.StatusInternalServerError)
 			return
 		}
-		fmt.Print(result)
+		slog.Info("Remote content deleted", "operation", "delete_content")
 
 		// Start a transaction
 		tx, err := db.BeginTx(r.Context(), nil)
@@ -167,31 +233,42 @@ func DeleteContentFromDB(queries *database.Queries, gofileClient *api.Api, db *s
 		// Commit the transaction
 
 		if err := tx.Commit(); err != nil {
-			fmt.Printf("error deleting 4: %s\n", err)
+			slog.Error("Content deletion failed", "operation", "delete_content", "reason", "transaction_commit_failed", "error_type", fmt.Sprintf("%T", err))
 			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 			return
 		}
 
-		// Fetch updated torrent list
-		rootFolderID := upload.RootFolderPlaceholder
-		folderParams := database.GetFolderContentsParams{
-			ParentFolderID: rootFolderID,
-			FolderID:       rootFolderID,
-			UserID:         sql.NullString{String: userID, Valid: userID != ""},
-		}
-		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
-		if err != nil {
-			http.Error(w, "Failed to fetch updated list", http.StatusInternalServerError)
-			return
-		}
-
-		// Render updated download list
-		w.WriteHeader(http.StatusOK)
-		components.DownloadList(false, torrents, rootFolderID, userID != "").Render(r.Context(), w)
+		renderLibraryAfterDelete(w, r, queries)
 	}
 }
 
-func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, db *sql.DB) http.HandlerFunc {
+type contentDeleter interface {
+	DeleteContent(...string) (model.DeleteContentResponse, error)
+}
+
+// The SDK does not turn API-level or per-item failures into Go errors. Require
+// explicit confirmation for every item before removing local references.
+func deleteRemoteContentConfirmed(client contentDeleter, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	response, err := client.DeleteContent(ids...)
+	if err != nil {
+		return fmt.Errorf("remote delete request failed: %w", err)
+	}
+	if response.Status != "ok" {
+		return fmt.Errorf("remote delete not confirmed")
+	}
+	for _, id := range ids {
+		item, ok := response.Data[id]
+		if !ok || item.Status != "ok" {
+			return fmt.Errorf("remote item deletion not confirmed")
+		}
+	}
+	return nil
+}
+
+func DeleteStaleContentFromDB(queries *database.Queries, gofileClient contentDeleter, db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Only authenticated users may clear stale content.
 		userID, _ := r.Context().Value(UserIDKey).(string)
@@ -236,18 +313,34 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 			}
 		}
 
-		// Delete from Gofile first
-		if len(staleFiles) != 0 {
-			_, err = gofileClient.DeleteContent(staleFiles...)
-			if err != nil {
-				fmt.Printf("Failed to delete stale files from Gofile: %v\n", err)
+		// A stale owned folder can contain another user's content. Never pass such
+		// a subtree to the remote recursive deletion API.
+		if !isAdmin {
+			safeFolders := make([]string, 0, len(staleFolders))
+			for _, id := range staleFolders {
+				owned, err := queries.LibrarySubtreeOwned(r.Context(), id, userID)
+				if err != nil {
+					http.Error(w, "Failed to verify folder ownership", http.StatusInternalServerError)
+					return
+				}
+				if owned && id != upload.RootFolderPlaceholder {
+					safeFolders = append(safeFolders, id)
+				}
 			}
+			staleFolders = safeFolders
 		}
-		if len(staleFolders) != 0 {
-			_, err = gofileClient.DeleteContent(staleFolders...)
-			if err != nil {
-				fmt.Printf("Failed to delete stale folders from Gofile: %v\n", err)
-			}
+		// Fail closed before opening the DB transaction. A batch or transport
+		// failure can have partial remote effects: retain ALL references rather
+		// than guessing which files (including folder descendants) were removed.
+		if err = deleteRemoteContentConfirmed(gofileClient, staleFiles); err != nil {
+			slog.Error("Stale content deletion failed", "operation", "delete_stale_files", "reason", "remote_delete_unconfirmed", "error_type", fmt.Sprintf("%T", err))
+			http.Error(w, "Gofile deletion could not be confirmed. Library records were preserved; some remote items may already have been removed.", http.StatusBadGateway)
+			return
+		}
+		if err = deleteRemoteContentConfirmed(gofileClient, staleFolders); err != nil {
+			slog.Error("Stale content deletion failed", "operation", "delete_stale_folders", "reason", "remote_delete_unconfirmed", "error_type", fmt.Sprintf("%T", err))
+			http.Error(w, "Gofile deletion could not be confirmed. Library records were preserved; some remote items may already have been removed.", http.StatusBadGateway)
+			return
 		}
 
 		// Start a transaction
@@ -314,21 +407,6 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient *api.Api, 
 			return
 		}
 
-		// Fetch updated torrent list
-		rootFolderID := upload.RootFolderPlaceholder
-		folderParams := database.GetFolderContentsParams{
-			ParentFolderID: rootFolderID,
-			FolderID:       rootFolderID,
-			UserID:         sql.NullString{String: userID, Valid: userID != ""},
-		}
-		torrents, err := queries.GetFolderContents(r.Context(), folderParams)
-		if err != nil {
-			http.Error(w, "Failed to fetch updated list", http.StatusInternalServerError)
-			return
-		}
-
-		// Render updated download list (user is authenticated here)
-		w.WriteHeader(http.StatusOK)
-		components.DownloadList(false, torrents, rootFolderID, true).Render(r.Context(), w)
+		renderLibraryAfterDelete(w, r, queries)
 	}
 }

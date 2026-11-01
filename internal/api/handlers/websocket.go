@@ -1,30 +1,28 @@
 package handlers
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/websocket"
 	ws "github.com/plutack/seedrlike/internal/core/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
+// Gorilla's default origin check permits only same-host browser connections.
+var upgrader = websocket.Upgrader{}
 
 func UpgradeRequest(wm *ws.WebsocketManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Upgrade HTTP request to WebSocket connection
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Println("Error upgrading request:", err)
+			slog.Error("WebSocket upgrade failed", "operation", "websocket_upgrade", "reason", "upgrade_failed", "error_type", fmt.Sprintf("%T", err))
 			http.Error(w, "Could not open WebSocket connection", http.StatusInternalServerError)
 			return
 		}
 
-		log.Println("A new user connected")
+		slog.Debug("WebSocket connected", "operation", "websocket_connect")
 		userID, _ := r.Context().Value(UserIDKey).(string)
 		var userIDPtr *string
 		if userID != "" {
@@ -33,7 +31,12 @@ func UpgradeRequest(wm *ws.WebsocketManager) http.HandlerFunc {
 		wm.RegisterClient(conn, userIDPtr)
 		defer wm.UnregisterClient(conn)
 
-		// Keep connection open to handle potential disconnections
-		select {}
+		// Read control frames so closed sockets release their handler and registration.
+		conn.SetReadLimit(1024)
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
 	}
 }

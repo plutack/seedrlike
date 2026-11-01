@@ -31,7 +31,7 @@ func AuthLayout(content templ.Component) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full bg-white\"><head><title>Seedrlike - Auth</title><link rel=\"icon\" type=\"image/png\" href=\"/assets/bird.png\" hx-preserve=\"true\"><meta charset=\"UTF-8\" hx-preserve=\"true\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" hx-preserve=\"true\"><script defer src=\"/assets/js/htmx.min.js\" hx-preserve=\"true\"></script><script defer src=\"/assets/js/htmx.ext.ws.js\" hx-preserve=\"true\"></script><script defer src=\"/assets/js/alpine.min.js\" hx-preserve=\"true\"></script><link href=\"/assets/css/tailwind.css\" rel=\"stylesheet\" hx-preserve=\"true\"></head><body class=\"h-full\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full bg-white\"><head><title>Seedrlike - Auth</title><link rel=\"icon\" type=\"image/png\" href=\"/assets/bird.png\" hx-preserve=\"true\"><meta charset=\"UTF-8\" hx-preserve=\"true\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" hx-preserve=\"true\"><script defer src=\"/assets/js/htmx.min.js\" hx-preserve=\"true\"></script><script defer src=\"/assets/js/htmx.ext.ws.js\" hx-preserve=\"true\"></script><script defer src=\"/assets/js/alpine.min.js\" hx-preserve=\"true\"></script><link href=\"/assets/css/tailwind.css\" rel=\"stylesheet\" hx-preserve=\"true\"><style>[x-cloak]{display:none !important}</style></head><body class=\"h-full\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

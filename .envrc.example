@@ -11,15 +11,10 @@ MAX_ACTIVE_DOWNLOAD_GB=50 # global reserved disk budget; includes full torrent +
 DOWNLOAD_DIR=./data/downloads # persist this directory across restarts; separate from Gofile storage
 LOG_LEVEL=info # slog JSON to stdout: debug, info, warn, error; debug includes progress logs
 
-# Optional email notifications. Disabled until configured.
-APP_BASE_URL=https://seedrlike.example.com
-# Google SMTP: use the full account address and a Google App Password.
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_TLS_MODE=starttls
-SMTP_FROM="Seedrlike <your-account@gmail.com>" # use the account address or an authorized Send mail as alias
-SMTP_USERNAME=your-account@gmail.com
-SMTP_PASSWORD=change-me # Google App Password, not your normal account password
-SMTP_TIMEOUT=10s
-# Development only: permits plaintext SMTP and HTTP links on literal loopback/localhost.
-# SMTP_ALLOW_INSECURE_LOCALHOST=true
+# Optional email notifications.
+APP_BASE_URL=https://seedrlike.example.com # required trusted public HTTPS origin, no path/query/fragment
+RESEND_API_KEY=change-me # required Resend API key; whitespace is not allowed
+RESEND_FROM="Seedrlike <notifications@example.com>" # required mailbox on your Resend-verified domain; display name optional
+RESEND_TIMEOUT=10s # optional request timeout; 1s through 1m, default 10s
+# Development only: permits an HTTP APP_BASE_URL on localhost or a literal loopback IP.
+# EMAIL_ALLOW_INSECURE_LOCALHOST=true

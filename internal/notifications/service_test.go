@@ -13,7 +13,7 @@ import (
 )
 
 // A recording SQL driver keeps security assertions hermetic and avoids a live
-// database, a new test dependency, and all outbound SMTP.
+// database, a new test dependency, and all outbound email delivery.
 type recordingDriver struct{ state *recordedSQL }
 type recordedSQL struct {
 	query    string

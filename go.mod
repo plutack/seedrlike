@@ -13,6 +13,7 @@ require (
 	github.com/klauspost/compress v1.18.5
 	github.com/plutack/go-gofile v1.0.11
 	github.com/pressly/goose/v3 v3.24.1
+	github.com/resend/resend-go/v4 v4.11.0
 	golang.org/x/crypto v0.38.0
 )
 

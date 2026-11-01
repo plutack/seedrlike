@@ -2,18 +2,13 @@ package notifications
 
 import (
 	"context"
-	"io"
-	"mime"
-	"mime/multipart"
-	"mime/quotedprintable"
-	"net/mail"
 	"strings"
 	"testing"
 	"time"
 )
 
 func testConfig() Config {
-	return Config{BaseURL: "https://seed.example", Host: "smtp.example", Port: "587", From: "Seedrlike <hello@seed.example>", Timeout: 10 * time.Second}
+	return Config{BaseURL: "https://seed.example", APIKey: "re_test_placeholder", From: "Seedrlike <hello@seed.example>", Timeout: 10 * time.Second}
 }
 func TestConfigValidation(t *testing.T) {
 	good := testConfig()
@@ -29,20 +24,15 @@ func TestConfigValidation(t *testing.T) {
 			}
 		})
 	}
-	for _, host := range []string{"smtp.example", "127.0.0.1.evil.example", "localhost.evil.example"} {
-		c := good
-		c.AllowInsecureLocalhost = true
-		c.Host = host
-		if c.Validate() == nil {
-			t.Fatal("accepted remote plaintext SMTP", host)
-		}
-	}
 	c := good
 	c.AllowInsecureLocalhost = true
-	c.Host = "127.0.0.1"
 	c.BaseURL = "http://localhost:8080"
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	c.BaseURL = "http://remote.example"
+	if c.Validate() == nil {
+		t.Fatal("accepted insecure remote origin")
 	}
 	c = good
 	c.From = "a@example.com\r\nBcc: victim@example.com"
@@ -50,70 +40,56 @@ func TestConfigValidation(t *testing.T) {
 		t.Fatal("accepted header injection")
 	}
 	c = good
-	c.Username = "user"
+	c.APIKey = ""
 	if c.Validate() == nil {
-		t.Fatal("accepted unpaired credentials")
+		t.Fatal("accepted missing api key")
+	}
+	c.APIKey = "re_key\r\nsecret"
+	if c.Validate() == nil {
+		t.Fatal("accepted key with whitespace")
 	}
 }
 func TestConfigFromEnv(t *testing.T) {
-	for k, v := range map[string]string{"APP_BASE_URL": "https://seed.example/", "SMTP_HOST": "smtp.example", "SMTP_FROM": "hello@seed.example", "SMTP_PORT": "", "SMTP_USERNAME": "", "SMTP_PASSWORD": "", "SMTP_TLS_MODE": "", "SMTP_TIMEOUT": "", "SMTP_ALLOW_INSECURE_LOCALHOST": ""} {
+	for k, v := range map[string]string{"APP_BASE_URL": "https://seed.example/", "RESEND_API_KEY": "re_test_placeholder", "RESEND_FROM": "hello@seed.example", "RESEND_TIMEOUT": "", "EMAIL_ALLOW_INSECURE_LOCALHOST": ""} {
 		t.Setenv(k, v)
 	}
 	c, err := ConfigFromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.BaseURL != "https://seed.example" || c.Port != "587" {
-		t.Fatalf("unexpected config %#v", c)
+	if c.BaseURL != "https://seed.example" || c.Timeout != 10*time.Second {
+		t.Fatal("unexpected config")
 	}
-	t.Setenv("SMTP_TLS_MODE", "implicit")
-	c, err = ConfigFromEnv()
-	if err != nil || c.Port != "465" || !c.ImplicitTLS {
-		t.Fatal(c, err)
-	}
-	t.Setenv("SMTP_TLS_MODE", "none")
-	if _, err = ConfigFromEnv(); err == nil {
-		t.Fatal("accepted disabled TLS")
-	}
-	t.Setenv("SMTP_TLS_MODE", "starttls")
-	t.Setenv("SMTP_TIMEOUT", "0s")
+	t.Setenv("RESEND_TIMEOUT", "0s")
 	if _, err = ConfigFromEnv(); err == nil {
 		t.Fatal("accepted unbounded timeout")
 	}
+	t.Setenv("RESEND_TIMEOUT", "invalid")
+	if _, err = ConfigFromEnv(); err == nil {
+		t.Fatal("accepted malformed timeout")
+	}
+	t.Setenv("RESEND_TIMEOUT", "1m")
+	t.Setenv("EMAIL_ALLOW_INSECURE_LOCALHOST", "invalid")
+	if _, err = ConfigFromEnv(); err == nil {
+		t.Fatal("accepted invalid dev flag")
+	}
 }
-func TestMultipartTemplatesEscape(t *testing.T) {
+func TestTemplatesEscape(t *testing.T) {
 	for _, kind := range []string{"ready", "failed", "verify", "test"} {
 		t.Run(kind, func(t *testing.T) {
 			payload := `<img src=x onerror="alert(1)"> & report`
-			raw, err := renderMail("hello@seed.example", "you@example.com", kind, payload, "https://seed.example/settings?a=1&b=2")
+			msg, err := renderMail("hello@seed.example", "you@example.com", kind, payload, "https://seed.example/settings?a=1&b=2")
 			if err != nil {
 				t.Fatal(err)
 			}
-			msg, err := mail.ReadMessage(strings.NewReader(string(raw)))
-			if err != nil {
-				t.Fatal(err)
+			if !strings.Contains(msg.Text, payload) {
+				t.Fatal("plaintext lost name")
 			}
-			mt, p, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
-			if err != nil || mt != "multipart/alternative" {
-				t.Fatal(mt, err)
+			if strings.Contains(msg.Html, "<img src=x") || !strings.Contains(msg.Html, "&lt;img") {
+				t.Fatal("HTML did not escape hostile name")
 			}
-			parts := multipart.NewReader(msg.Body, p["boundary"])
-			for i := 0; i < 2; i++ {
-				part, err := parts.NextRawPart()
-				if err != nil {
-					t.Fatal(err)
-				}
-				b, err := io.ReadAll(quotedprintable.NewReader(part))
-				if err != nil {
-					t.Fatal(err)
-				}
-				text := string(b)
-				if i == 0 && !strings.Contains(text, payload) {
-					t.Fatal("plaintext lost name")
-				}
-				if i == 1 && (strings.Contains(text, "<img src=x") || !strings.Contains(text, "&lt;img")) {
-					t.Fatal("HTML did not escape hostile name")
-				}
+			if len(msg.To) != 1 || msg.To[0] != "you@example.com" || msg.Subject == "" {
+				t.Fatal("mail fields missing")
 			}
 		})
 	}
@@ -148,7 +124,7 @@ func TestTokens(t *testing.T) {
 }
 func TestNeverSendInTests(t *testing.T) {
 	if err := sendMail(context.Background(), testConfig(), "a@example.com", "test", "", "https://seed.example"); err == nil || !strings.Contains(err.Error(), "test binaries") {
-		t.Fatal("SMTP test guard absent", err)
+		t.Fatal("email test guard absent", err)
 	}
 }
 func TestEmailValidation(t *testing.T) {

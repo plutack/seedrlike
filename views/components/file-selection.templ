@@ -4,7 +4,6 @@ import "fmt"
 import "strconv"
 
 type SelectableFile struct { Index int; Name string; Size int64 }
-type BatchResult struct { Line int; Message string; Failed bool }
 
 func humanBytes(n int64) string {
  if n<1024 { return fmt.Sprintf("%d B",n) };v:=float64(n);units:=[]string{"B","KB","MB","GB","TB"};i:=0;for v>=1024&&i<len(units)-1{v/=1024;i++};return fmt.Sprintf("%.1f %s",v,units[i])
@@ -19,24 +18,6 @@ templ DownloadFeedback(message string, failed bool) {
    { message }
   </p>
   <button type="button" class="btn btn-ghost btn-xs shrink-0" aria-label="Dismiss notification" x-on:click="visible = false">Dismiss</button>
- </div>
-}
-
-templ BatchFeedback(results []BatchResult) {
- <div role="status" class="w-full min-w-0 rounded-box border border-base-300 p-3 text-sm space-y-2" x-data="{ visible: true }" x-show="visible">
-  <div class="flex items-center justify-between gap-3"><h3 class="font-semibold">Import results</h3><button type="button" class="btn btn-ghost btn-xs" x-on:click="visible = false" aria-label="Dismiss import results">Dismiss</button></div>
-  if len(results)==0 {
-   <p>Add a magnet link first.</p>
-  }
-  for _, result := range results {
-   <p class="break-words"><span class="font-medium">Item { strconv.Itoa(result.Line) }: </span>
-   if result.Failed {
-    <span class="text-error">{ result.Message }</span>
-   } else {
-    <span>{ result.Message }</span>
-   }
-   </p>
-  }
  </div>
 }
 

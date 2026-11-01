@@ -16,11 +16,6 @@ type SelectableFile struct {
 	Name  string
 	Size  int64
 }
-type BatchResult struct {
-	Line    int
-	Message string
-	Failed  bool
-}
 
 func humanBytes(n int64) string {
 	if n < 1024 {
@@ -64,7 +59,7 @@ func DownloadFeedback(message string, failed bool) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.FormatBool(failed))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 14, Col: 294}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 13, Col: 294}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -83,112 +78,13 @@ func DownloadFeedback(message string, failed bool) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 19, Col: 12}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 18, Col: 12}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><button type=\"button\" class=\"btn btn-ghost btn-xs shrink-0\" aria-label=\"Dismiss notification\" x-on:click=\"visible = false\">Dismiss</button></div>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func BatchFeedback(results []BatchResult) templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div role=\"status\" class=\"w-full min-w-0 rounded-box border border-base-300 p-3 text-sm space-y-2\" x-data=\"{ visible: true }\" x-show=\"visible\"><div class=\"flex items-center justify-between gap-3\"><h3 class=\"font-semibold\">Import results</h3><button type=\"button\" class=\"btn btn-ghost btn-xs\" x-on:click=\"visible = false\" aria-label=\"Dismiss import results\">Dismiss</button></div>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if len(results) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p>Add a magnet link first.</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		for _, result := range results {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"break-words\"><span class=\"font-medium\">Item ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(result.Line))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 32, Col: 84}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, ": </span> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if result.Failed {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<span class=\"text-error\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var6 string
-				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(result.Message)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 34, Col: 45}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</span>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<span>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var7 string
-				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(result.Message)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 36, Col: 26}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</span>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -212,12 +108,12 @@ func FilePickerDialog() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var8 == nil {
-			templ_7745c5c3_Var8 = templ.NopComponent
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<dialog id=\"file-picker\" class=\"modal\" aria-labelledby=\"file-picker-title\"><div class=\"modal-box w-full max-w-3xl p-4 sm:p-6\"><div class=\"flex items-center justify-between gap-3 mb-4\"><h2 id=\"file-picker-title\" class=\"text-xl font-semibold\">Choose files</h2><form method=\"dialog\"><button type=\"submit\" class=\"btn btn-ghost btn-sm\" aria-label=\"Close file selection\">Close</button></form></div><div id=\"file-picker-content\" aria-live=\"polite\"></div></div><form method=\"dialog\" class=\"modal-backdrop\"><button type=\"submit\" aria-label=\"Close file selection\">Close</button></form></dialog><template id=\"file-picker-loading\"><div class=\"flex flex-col items-center justify-center gap-3 py-12\" role=\"status\"><span class=\"loading loading-spinner loading-md text-primary\" aria-hidden=\"true\"></span><p class=\"text-sm\">Loading files…</p></div></template>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<dialog id=\"file-picker\" class=\"modal\" aria-labelledby=\"file-picker-title\"><div class=\"modal-box w-full max-w-3xl p-4 sm:p-6\"><div class=\"flex items-center justify-between gap-3 mb-4\"><h2 id=\"file-picker-title\" class=\"text-xl font-semibold\">Choose files</h2><form method=\"dialog\"><button type=\"submit\" class=\"btn btn-ghost btn-sm\" aria-label=\"Close file selection\">Close</button></form></div><div id=\"file-picker-content\" aria-live=\"polite\"></div></div><form method=\"dialog\" class=\"modal-backdrop\"><button type=\"submit\" aria-label=\"Close file selection\">Close</button></form></dialog><template id=\"file-picker-loading\"><div class=\"flex flex-col items-center justify-center gap-3 py-12\" role=\"status\"><span class=\"loading loading-spinner loading-md text-primary\" aria-hidden=\"true\"></span><p class=\"text-sm\">Loading files…</p></div></template>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -241,110 +137,110 @@ func FileSelection(magnet string, name string, zipped bool, files []SelectableFi
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var9 == nil {
-			templ_7745c5c3_Var9 = templ.NopComponent
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<form method=\"post\" action=\"/downloads\" hx-post=\"/downloads\" hx-target=\"#file-picker-feedback\" hx-swap=\"innerHTML\" hx-disabled-elt=\"find button[type=submit]\" class=\"min-w-0 text-left\" x-data=\"{ bytes: 0, count: 0, sync() { const checked = [...this.$root.querySelectorAll(&#39;input[name=files]:checked&#39;)]; this.count=checked.length; this.bytes=checked.reduce((n,c)=&gt;n+Number(c.dataset.size),0); }, all(value) { this.$root.querySelectorAll(&#39;input[name=files]&#39;).forEach(c=&gt;c.checked=value); this.sync(); } }\" x-init=\"sync()\"><input type=\"hidden\" name=\"magnet-link\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<form method=\"post\" action=\"/downloads\" hx-post=\"/downloads\" hx-target=\"#file-picker-feedback\" hx-swap=\"innerHTML\" hx-disabled-elt=\"find button[type=submit]\" class=\"min-w-0 text-left\" x-data=\"{ bytes: 0, count: 0, sync() { const checked = [...this.$root.querySelectorAll(&#39;input[name=files]:checked&#39;)]; this.count=checked.length; this.bytes=checked.reduce((n,c)=&gt;n+Number(c.dataset.size),0); }, all(value) { this.$root.querySelectorAll(&#39;input[name=files]&#39;).forEach(c=&gt;c.checked=value); this.sync(); } }\" x-init=\"sync()\"><input type=\"hidden\" name=\"magnet-link\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(magnet)
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(magnet)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 56, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 37, Col: 56}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\"> <input type=\"hidden\" name=\"selection\" value=\"explicit\"><h3 class=\"font-semibold break-all\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(name)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 58, Col: 44}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\"> <input type=\"hidden\" name=\"selection\" value=\"explicit\"><h3 class=\"font-semibold break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</h3><div id=\"file-picker-feedback\" class=\"mt-3\" aria-live=\"polite\"></div><div class=\"flex flex-wrap items-center gap-3 py-3 text-sm\"><button type=\"button\" class=\"btn btn-ghost btn-xs\" x-on:click=\"all(true)\">Select all</button> <button type=\"button\" class=\"btn btn-ghost btn-xs\" x-on:click=\"all(false)\">Clear</button> <span aria-live=\"polite\" x-text=\"count + &#39; files · &#39; + (bytes / 1048576).toFixed(1) + &#39; MB&#39;\"></span></div><div class=\"max-h-96 overflow-y-auto divide-y divide-base-200\">")
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(name)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 39, Col: 44}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</h3><div id=\"file-picker-feedback\" class=\"mt-3\" aria-live=\"polite\"></div><div class=\"flex flex-wrap items-center gap-3 py-3 text-sm\"><button type=\"button\" class=\"btn btn-ghost btn-xs\" x-on:click=\"all(true)\">Select all</button> <button type=\"button\" class=\"btn btn-ghost btn-xs\" x-on:click=\"all(false)\">Clear</button> <span aria-live=\"polite\" x-text=\"count + &#39; files · &#39; + (bytes / 1048576).toFixed(1) + &#39; MB&#39;\"></span></div><div class=\"max-h-96 overflow-y-auto divide-y divide-base-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, file := range files {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<label class=\"flex items-center gap-3 py-3 cursor-pointer\"><input type=\"checkbox\" name=\"files\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<label class=\"flex items-center gap-3 py-3 cursor-pointer\"><input type=\"checkbox\" name=\"files\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var12 string
-			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(file.Index))
+			var templ_7745c5c3_Var8 string
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(file.Index))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 68, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 49, Col: 73}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" data-size=\"")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var13 string
-			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.FormatInt(file.Size, 10))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 68, Col: 119}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" data-size=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" checked class=\"checkbox checkbox-sm checkbox-primary shrink-0\" x-on:change=\"sync()\"> <span class=\"min-w-0 flex-1 break-all text-sm\">")
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.FormatInt(file.Size, 10))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 49, Col: 119}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var14 string
-			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(file.Name)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 69, Col: 63}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" checked class=\"checkbox checkbox-sm checkbox-primary shrink-0\" x-on:change=\"sync()\"> <span class=\"min-w-0 flex-1 break-all text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</span> <span class=\"text-xs whitespace-nowrap text-base-content/70\">")
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(file.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 50, Col: 63}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var15 string
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(humanBytes(file.Size))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 70, Col: 89}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</span> <span class=\"text-xs whitespace-nowrap text-base-content/70\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</span></label>")
+			var templ_7745c5c3_Var11 string
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(humanBytes(file.Size))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/file-selection.templ`, Line: 51, Col: 89}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span></label>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div><div class=\"flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-base-300\"><label class=\"flex items-center gap-2 text-sm\"><input type=\"checkbox\" name=\"is-zipped\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><div class=\"flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-base-300\"><label class=\"flex items-center gap-2 text-sm\"><input type=\"checkbox\" name=\"is-zipped\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if zipped {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, " checked")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, " class=\"checkbox checkbox-sm\">ZIP download</label> <button type=\"submit\" class=\"btn btn-primary btn-sm\" x-bind:disabled=\"count === 0\">Download selected</button></div></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " class=\"checkbox checkbox-sm\">ZIP download</label> <button type=\"submit\" class=\"btn btn-primary btn-sm\" x-bind:disabled=\"count === 0\">Download selected</button></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

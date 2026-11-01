@@ -83,7 +83,7 @@ func (s *Server) registerRoutes() {
 	apiRouter.HandleFunc("/settings/test", settings.Test).Methods(PostMethod)
 	apiRouter.HandleFunc("/admin", admin.Dashboard).Methods(GetMethod)
 	apiRouter.HandleFunc("/downloads/preview", d.Preview).Methods(PostMethod)
-	apiRouter.HandleFunc("/downloads/batch", d.Batch).Methods(PostMethod)
+	apiRouter.HandleFunc("/downloads/torrent", d.UploadTorrent).Methods(PostMethod)
 	authHandler := handlers.NewAuthHandler(s.dbQueries)
 	// Search talks to the external torrentgo service (TORRENTGO_URL, default
 	// http://localhost:8080). Credentials must match the service's USERNAME/PASSWORD.

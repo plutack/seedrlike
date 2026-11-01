@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,7 +42,7 @@ func requireDownloadUser(w http.ResponseWriter, r *http.Request) string {
 }
 func publicQueueError(err error) string {
 	switch err.Error() {
-	case "invalid magnet link", "select at least one file", "invalid file selection", "download queue full", "torrent already active":
+	case "invalid torrent file", "v2-only torrent files are not supported", "invalid magnet link", "select at least one file", "invalid file selection", "download queue full", "torrent already active":
 		return err.Error()
 	default:
 		slog.Error("Queue request failed", "operation", "enqueue_download", "reason", "queue_unavailable", "error_type", fmt.Sprintf("%T", err))
@@ -107,43 +109,52 @@ func (d *DownloadHandler) StopDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	sendResponse(w, 200, "Download cancelled")
 }
-func (d *DownloadHandler) Batch(w http.ResponseWriter, r *http.Request) {
+
+// UploadTorrent accepts one bounded multipart file; filename and MIME type are
+// only UI hints. The bencoded content is validated again at the queue boundary.
+func (d *DownloadHandler) UploadTorrent(w http.ResponseWriter, r *http.Request) {
 	userID := requireDownloadUser(w, r)
 	if userID == "" {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid batch", 400)
+	fail := func(message string) { components.DownloadFeedback(message, true).Render(r.Context(), w) }
+	r.Body = http.MaxBytesReader(w, r.Body, queue.MaxTorrentFileSize+(64<<10))
+	if err := r.ParseMultipartForm(queue.MaxTorrentFileSize + (64 << 10)); err != nil {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+		fail("Choose a .torrent file up to 4 MB.")
 		return
 	}
-	lines := strings.Split(strings.ReplaceAll(r.FormValue("magnets"), "\r\n", "\n"), "\n")
-	if len(lines) > 50 {
-		components.DownloadFeedback("Import up to 50 links at a time.", true).Render(r.Context(), w)
+	defer r.MultipartForm.RemoveAll()
+	if len(r.MultipartForm.File["torrent-file"]) != 1 {
+		fail("Choose one .torrent file.")
 		return
 	}
-	var results []components.BatchResult
-	accepted := make([]string, 0, len(lines))
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		err := d.queue.Add(queue.DownloadRequest{MagnetLink: line, IsZipped: r.FormValue("is-zipped") == "on", UserID: &userID})
-		message := "Added to queue"
-		if err != nil {
-			message = publicQueueError(err)
-		} else {
-			accepted = append(accepted, line)
-		}
-		results = append(results, components.BatchResult{Line: i + 1, Message: message, Failed: err != nil})
+	file, header, err := r.FormFile("torrent-file")
+	if err != nil {
+		fail("Choose a .torrent file.")
+		return
 	}
-	// Remove only accepted entries from the client list. Rejected entries remain
-	// editable/removable, so retrying a partial import cannot enqueue successes twice.
-	event, _ := json.Marshal(map[string]any{"batch-imported": map[string]any{"accepted": accepted}})
-	w.Header().Set("HX-Trigger", string(event))
-	components.BatchFeedback(results).Render(r.Context(), w)
+	defer file.Close()
+	if !strings.EqualFold(filepath.Ext(header.Filename), ".torrent") || header.Size > queue.MaxTorrentFileSize {
+		fail("Choose a .torrent file up to 4 MB.")
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(file, queue.MaxTorrentFileSize+1))
+	if err != nil || len(data) > queue.MaxTorrentFileSize {
+		fail("Could not read the torrent file (4 MB maximum).")
+		return
+	}
+	err = d.queue.Add(queue.DownloadRequest{TorrentData: data, IsZipped: r.FormValue("is-zipped") == "on", UserID: &userID})
+	if err != nil {
+		fail(publicQueueError(err))
+		return
+	}
+	w.Header().Set("HX-Trigger", "torrent-uploaded")
+	components.DownloadFeedback("Added to queue.", false).Render(r.Context(), w)
 }
+
 func (d *DownloadHandler) Preview(w http.ResponseWriter, r *http.Request) {
 	if requireDownloadUser(w, r) == "" {
 		return

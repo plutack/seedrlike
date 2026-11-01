@@ -2,28 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-function batch() {
-    const context = { window: {}, document: { addEventListener() {} }, URL };
-    vm.runInNewContext(fs.readFileSync(__dirname + '/download-ui.js', 'utf8'), context);
-    return Object.assign(context.window.magnetBatch(), { $nextTick(fn) { fn(); }, $refs: { draft: { focus() {} } } });
+function fixture() {
+ const listeners={}; let aborted=false;
+ const modal={open:false,showModal(){this.open=true},close(){this.open=false}};
+ const content={replaceChildren(){}};
+ const document={addEventListener(name,fn){listeners[name]=fn},getElementById(id){return {'file-picker':modal,'file-picker-content':content,'file-picker-loading':{content:{cloneNode(){return {}}}}}[id]}};
+ vm.runInNewContext(fs.readFileSync(__dirname+'/download-ui.js','utf8'),{document});
+ return {listeners,modal,xhr:{abort(){aborted=true}},get aborted(){return aborted}};
 }
-test('paste and Add creates a removable named entry without exposing HTML', () => {
-    const b = batch();
-    b.draft = 'magnet:?xt=urn:btih:abc&dn=My%20file'; b.add();
-    assert.equal(b.links.length, 1); assert.equal(b.draft, ''); assert.equal(b.label(b.links[0]), 'My file');
-    b.links.splice(0, 1); assert.equal(b.links.length, 0);
+test('preview immediately opens modal; closing aborts lookup',()=>{
+ const f=fixture();f.listeners['htmx:beforeRequest']({detail:{requestConfig:{path:'/downloads/preview'},xhr:f.xhr}});
+ assert.equal(f.modal.open,true);f.listeners.close({target:{id:'file-picker'}});assert.equal(f.aborted,true);
 });
-test('validation rejects empty, malformed, duplicate, multiline and excessive entries', () => {
-    const b = batch();
-    for (const value of ['', 'https://example.com', 'magnet:?dn=test', 'magnet:?xt=a\nmagnet:?xt=b']) {
-        b.draft = value; b.add(); assert.equal(b.links.length, 0); assert.ok(b.error);
-    }
-    b.draft = 'magnet:?xt=abc'; b.add(); b.draft = 'magnet:?xt=abc'; b.add();
-    assert.equal(b.links.length, 1); assert.match(b.error, /already/);
-    b.links = Array.from({ length: 50 }, (_, i) => 'magnet:?xt=' + i);
-    b.draft = 'magnet:?xt=extra'; b.add(); assert.equal(b.links.length, 50);
-});
-test('partial imports remove only accepted entries and retain failures for retry', () => {
-    const b = batch(); b.links = ['magnet:?xt=a', 'magnet:?xt=b'];
-    b.imported(['magnet:?xt=a']); assert.deepEqual(b.links, ['magnet:?xt=b']);
-});
+test('queue success closes modal',()=>{const f=fixture();f.modal.open=true;f.listeners['download-queued']();assert.equal(f.modal.open,false)});

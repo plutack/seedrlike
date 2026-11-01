@@ -7,18 +7,18 @@ import (
 	"testing"
 )
 
-func TestBatchImportUsesRemovableItemsAndModalPreview(t *testing.T) {
+func TestTorrentUploadReplacesBatchImportAndRetainsModalPreview(t *testing.T) {
 	var out bytes.Buffer
 	if err := Download().Render(context.Background(), &out); err != nil {
 		t.Fatal(err)
 	}
 	html := out.String()
-	for _, want := range []string{`x-data="magnetBatch()"`, `x-for="(link, index) in links"`, `links.splice(index, 1)`, `name="magnets"`, `links.join(`, `hx-target="#file-picker-content"`, `id="file-picker"`, `aria-labelledby="file-picker-title"`, `id="file-picker-loading"`, `loading-spinner`} {
+	for _, want := range []string{`name="torrent-file"`, `type="file"`, `hx-post="/downloads/torrent"`, `hx-encoding="multipart/form-data"`, `torrent-uploaded.window`, "Download torrent", `hx-target="#file-picker-content"`, `id="file-picker"`, `aria-labelledby="file-picker-title"`, `id="file-picker-loading"`, `loading-spinner`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing batch/modal behavior %s", want)
 		}
 	}
-	for _, old := range []string{"One magnet link per line", `id="metadata-loading"`, "max-w-2xl"} {
+	for _, old := range []string{"Import multiple magnets", "magnetBatch", "/downloads/batch", "One magnet link per line", `id="metadata-loading"`, "max-w-2xl"} {
 		if strings.Contains(html, old) {
 			t.Errorf("obsolete UI remains: %s", old)
 		}

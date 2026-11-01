@@ -32,9 +32,29 @@ templ FilePickerDialog() {
  <template id="file-picker-loading"><div class="flex flex-col items-center justify-center gap-3 py-12" role="status"><span class="loading loading-spinner loading-md text-primary" aria-hidden="true"></span><p class="text-sm">Loading files…</p></div></template>
 }
 
+func selectionEncoding(uploaded bool) string {
+ if uploaded { return "multipart/form-data" }; return "application/x-www-form-urlencoded"
+}
+
+func selectionEndpoint(uploaded bool) string {
+ if uploaded { return "/downloads/torrent" }; return "/downloads"
+}
+
 templ FileSelection(magnet string, name string, zipped bool, files []SelectableFile) {
- <form method="post" action="/downloads" hx-post="/downloads" hx-target="#file-picker-feedback" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" class="min-w-0 text-left" x-data="{ bytes: 0, count: 0, sync() { const checked = [...this.$root.querySelectorAll('input[name=files]:checked')]; this.count=checked.length; this.bytes=checked.reduce((n,c)=>n+Number(c.dataset.size),0); }, all(value) { this.$root.querySelectorAll('input[name=files]').forEach(c=>c.checked=value); this.sync(); } }" x-init="sync()">
-  <input type="hidden" name="magnet-link" value={ magnet }/>
+ @fileSelectionForm(magnet, name, zipped, files, false)
+}
+
+templ UploadedFileSelection(name string, zipped bool, files []SelectableFile) {
+ @fileSelectionForm("", name, zipped, files, true)
+}
+
+templ fileSelectionForm(magnet string, name string, zipped bool, files []SelectableFile, uploaded bool) {
+ <form method="post" action={ templ.SafeURL(selectionEndpoint(uploaded)) } hx-post={ selectionEndpoint(uploaded) } data-upload-selection={ strconv.FormatBool(uploaded) } hx-encoding={ selectionEncoding(uploaded) } hx-target="#file-picker-feedback" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" class="min-w-0 text-left" x-data="{ bytes: 0, count: 0, sync() { const checked = [...this.$root.querySelectorAll('input[name=files]:checked')]; this.count=checked.length; this.bytes=checked.reduce((n,c)=>n+Number(c.dataset.size),0); }, all(value) { this.$root.querySelectorAll('input[name=files]').forEach(c=>c.checked=value); this.sync(); } }" x-init="sync()">
+  if uploaded {
+   <input type="file" name="torrent-file" id="torrent-selection-file" class="hidden" aria-hidden="true" tabindex="-1"/>
+  } else {
+   <input type="hidden" name="magnet-link" value={ magnet }/>
+  }
   <input type="hidden" name="selection" value="explicit"/>
   <h3 class="font-semibold break-all">{ name }</h3>
   <div id="file-picker-feedback" class="mt-3" aria-live="polite"></div>

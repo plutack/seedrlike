@@ -146,12 +146,42 @@ func (d *DownloadHandler) UploadTorrent(w http.ResponseWriter, r *http.Request) 
 		fail("Could not read the torrent file (4 MB maximum).")
 		return
 	}
-	err = d.queue.Add(queue.DownloadRequest{TorrentData: data, IsZipped: r.FormValue("is-zipped") == "on", UserID: &userID})
+	mi, _, err := queue.ParseTorrentFile(data)
 	if err != nil {
 		fail(publicQueueError(err))
 		return
 	}
-	w.Header().Set("HX-Trigger", "torrent-uploaded")
+	info, _ := mi.UnmarshalInfo()
+	files := info.UpvertedFiles()
+	if r.FormValue("action") == "preview" {
+		items := make([]components.SelectableFile, 0, len(files))
+		for i, f := range files {
+			items = append(items, components.SelectableFile{Index: i, Name: f.DisplayPath(&info), Size: f.Length})
+		}
+		components.UploadedFileSelection(info.BestName(), r.FormValue("is-zipped") == "on", items).Render(r.Context(), w)
+		return
+	}
+	var selected []int
+	if r.FormValue("selection") == "explicit" {
+		selected, err = parseSelection(r.MultipartForm.Value["files"])
+		if err != nil {
+			fail(err.Error())
+			return
+		}
+		for _, index := range selected {
+			if index >= len(files) {
+				fail("invalid file selection")
+				return
+			}
+		}
+	}
+	err = d.queue.Add(queue.DownloadRequest{TorrentData: data, IsZipped: r.FormValue("is-zipped") == "on", UserID: &userID, Selected: selected})
+	if err != nil {
+		fail(publicQueueError(err))
+		return
+	}
+	w.Header().Set("HX-Retarget", "#torrent-upload-response")
+	w.Header().Set("HX-Trigger", "torrent-uploaded, download-queued")
 	components.DownloadFeedback("Added to queue.", false).Render(r.Context(), w)
 }
 

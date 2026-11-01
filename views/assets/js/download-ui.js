@@ -1,7 +1,7 @@
 // File selection is local until explicit submission; HTMX owns the upload.
 window.torrentUpload = function () {
     return {
-        file: null, error: '', busy: false, dragging: false, percent: 0,
+        file: null, error: '', busy: false, dragging: false, percent: 0, previewing: false,
         size(bytes) { return bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB'; },
         clearFeedback() { this.$root.querySelector('#torrent-upload-response').replaceChildren(); },
         choose(files) {
@@ -31,6 +31,7 @@ window.torrentUpload = function () {
             this.clearFeedback(); this.$refs.file.focus();
         },
         start(event) {
+            this.previewing = event.detail?.requestConfig?.parameters?.action === 'preview';
             if (!this.file || this.busy) { event.preventDefault(); return; }
             this.busy = true; this.percent = 0; this.error = ''; this.clearFeedback();
         },
@@ -38,7 +39,7 @@ window.torrentUpload = function () {
             if (this.busy && event.detail.total > 0) this.percent = Math.min(100, Math.round(event.detail.loaded / event.detail.total * 100));
         },
         finish(event) {
-            this.busy = false;
+            this.busy = false; this.previewing = false;
             if (event.detail.failed) this.error = 'Upload failed. Your file is still selected. Try again.';
         },
         accepted() {
@@ -65,7 +66,7 @@ window.torrentUpload = function () {
     }
     document.addEventListener('htmx:beforeRequest', event => {
         const detail = event.detail;
-        if (!detail.requestConfig || detail.requestConfig.path !== '/downloads/preview') return;
+        if (!detail.requestConfig || !(detail.requestConfig.path === '/downloads/preview' || (detail.requestConfig.path === '/downloads/torrent' && detail.requestConfig.parameters.action === 'preview'))) return;
         const modal = dialog();
         if (!modal) return;
         if (previewXHR) previewXHR.abort();
@@ -73,6 +74,17 @@ window.torrentUpload = function () {
         const template = document.getElementById('file-picker-loading');
         content().replaceChildren(template.content.cloneNode(true));
         if (!modal.open) modal.showModal();
+    });
+    // Keep the file browser-local: copy it to the selection form only after
+    // preview. No temporary server upload or client-editable metadata token.
+    document.addEventListener('htmx:afterSwap', event => {
+        if (event.detail.target.id !== 'file-picker-content') return;
+        const input = document.getElementById('torrent-selection-file');
+        const original = document.getElementById('torrent-file');
+        if (input && original && original.files.length) {
+            const transfer = new DataTransfer(); transfer.items.add(original.files[0]);
+            input.files = transfer.files;
+        }
     });
     document.addEventListener('htmx:beforeSwap', event => {
         if (event.detail.target.id === 'file-picker-content' && !dialog().open) {

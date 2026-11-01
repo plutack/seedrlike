@@ -31,7 +31,7 @@ window.torrentUpload = function () {
             this.clearFeedback(); this.$refs.file.focus();
         },
         start(event) {
-            this.previewing = event.detail?.requestConfig?.parameters?.action === 'preview';
+            this.previewing = event.detail?.target?.id === 'file-picker-content';
             if (!this.file || this.busy) { event.preventDefault(); return; }
             this.busy = true; this.percent = 0; this.error = ''; this.clearFeedback();
         },
@@ -66,7 +66,9 @@ window.torrentUpload = function () {
     }
     document.addEventListener('htmx:beforeRequest', event => {
         const detail = event.detail;
-        if (!detail.requestConfig || !(detail.requestConfig.path === '/downloads/preview' || (detail.requestConfig.path === '/downloads/torrent' && detail.requestConfig.parameters.action === 'preview'))) return;
+        // Multipart parameters can expose action as a FormData value/list rather
+        // than a scalar. The resolved HTMX target is the stable preview contract.
+        if (detail.target?.id !== 'file-picker-content') return;
         const modal = dialog();
         if (!modal) return;
         if (previewXHR) previewXHR.abort();

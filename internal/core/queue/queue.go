@@ -258,6 +258,9 @@ func (q *DownloadQueue) Add(r DownloadRequest) error {
 			_ = root.RemoveAll(j.ID)
 			return fmt.Errorf("persist torrent metadata: %w", e)
 		}
+		if e = root.Rename(j.ID+"/metadata.torrent", j.ID+"/uploaded.torrent"); e != nil {
+			return e
+		}
 		// Keep metadata if Create returns an ambiguous database error: the job
 		// may have committed and must still be recoverable after restart.
 	}
@@ -568,6 +571,10 @@ infoWait:
 	if err = q.saveStage(task, StatusDownloading); err != nil {
 		return
 	}
+	reason = "torrent_metadata_cleanup_failed"
+	if err = removeTorrentMetadata(jobDir); err != nil {
+		return
+	}
 	for _, f := range chosen {
 		f.SetPriority(torrent.PiecePriorityNormal)
 	}
@@ -851,15 +858,19 @@ func stagePaths(jobDir string, paths []string) error {
 	return nil
 }
 
-// Cached metadata makes recovery independent of peer availability. A cache
-// with the wrong canonical hash is rejected rather than used for another job.
+// Queued uploads retain metadata until downloading starts. After cleanup,
+// recovery discovers metadata from peers using the persisted magnet instead.
+// A cache with the wrong canonical hash is rejected.
 func loadSpec(jobDir string, j jobs.Job) (*torrent.TorrentSpec, error) {
 	root, err := os.OpenRoot(jobDir)
 	if err != nil {
 		return nil, err
 	}
 	defer root.Close()
-	f, err := root.Open("metadata.torrent")
+	f, err := root.Open("uploaded.torrent")
+	if os.IsNotExist(err) {
+		f, err = root.Open("metadata.torrent")
+	}
 	if os.IsNotExist(err) {
 		return torrent.TorrentSpecFromMagnetUri(j.Magnet)
 	}
@@ -876,6 +887,22 @@ func loadSpec(jobDir string, j jobs.Job) (*torrent.TorrentSpec, error) {
 	}
 	return torrent.TorrentSpecFromMetaInfoErr(mi)
 }
+
+// Remove only known metadata files under the validated job root, never payloads.
+func removeTorrentMetadata(jobDir string) error {
+	root, err := os.OpenRoot(jobDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, name := range []string{"uploaded.torrent", "metadata.torrent", "metadata.tmp"} {
+		if err := root.Remove(name); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
 func persistMetadata(jobDir string, mi *metainfo.MetaInfo) error {
 	root, err := os.OpenRoot(jobDir)
 	if err != nil {

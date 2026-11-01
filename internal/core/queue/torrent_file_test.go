@@ -46,7 +46,7 @@ func TestTorrentUploadPersistsOriginalMetadataAndRecovers(t *testing.T) {
 	if err != nil || len(spec.InfoBytes) == 0 {
 		t.Fatalf("lost metadata: %v", err)
 	}
-	mi, err := metainfo.LoadFromFile(filepath.Join(dir, "metadata.torrent"))
+	mi, err := metainfo.LoadFromFile(filepath.Join(dir, "uploaded.torrent"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,6 +66,39 @@ func TestTorrentUploadPersistsOriginalMetadataAndRecovers(t *testing.T) {
 		t.Fatal("upload not recovered")
 	}
 }
+func TestTorrentMetadataCleanupPreservesPayloadAndAllowsMagnetRecovery(t *testing.T) {
+	s := &fakeStore{}
+	q := configured(t, s)
+	if err := q.Add(DownloadRequest{TorrentData: torrentFixture(t, nil)}); err != nil {
+		t.Fatal(err)
+	}
+	j := s.created[0]
+	dir := filepath.Join(q.dataDir, j.ID)
+	for _, name := range []string{"metadata.torrent", "metadata.tmp", "payload.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("keep payload"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := removeTorrentMetadata(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"uploaded.torrent", "metadata.torrent", "metadata.tmp"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("metadata remains: %s", name)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "payload.txt")); err != nil {
+		t.Fatal("payload removed", err)
+	}
+	spec, err := loadSpec(dir, j)
+	if err != nil || len(spec.InfoBytes) != 0 {
+		t.Fatalf("expected magnet fallback: %v", err)
+	}
+	if err := removeTorrentMetadata(dir); err != nil {
+		t.Fatal("cleanup must be idempotent", err)
+	}
+}
+
 func TestTorrentFileValidation(t *testing.T) {
 	cases := [][]byte{nil, []byte("not bencode"), make([]byte, MaxTorrentFileSize+1), torrentFixture(t, func(i *metainfo.Info) { i.Name = "../escape" }), torrentFixture(t, func(i *metainfo.Info) { i.PieceLength = 0 }), torrentFixture(t, func(i *metainfo.Info) { i.Pieces = nil }), torrentFixture(t, func(i *metainfo.Info) { i.Length = -1 }), torrentFixture(t, func(i *metainfo.Info) {
 		i.Length = 0

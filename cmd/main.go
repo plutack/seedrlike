@@ -16,6 +16,10 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("application_starting")
+	// Mutations require the browser Origin to equal APP_BASE_URL when it is
+	// set. Log the value at startup so deployment misconfigurations (missing,
+	// quoted, commented, or mismatched public origin) are immediately visible.
+	slog.Info("same_origin_policy", "app_base_url", os.Getenv("APP_BASE_URL"))
 	server, err := api.New()
 	if err != nil {
 		// Database DSNs and external-service errors can contain credentials.

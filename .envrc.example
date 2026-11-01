@@ -12,7 +12,7 @@ DOWNLOAD_DIR=./data/downloads # persist this directory across restarts; separate
 LOG_LEVEL=info # slog JSON to stdout: debug, info, warn, error; debug includes progress logs
 
 # Optional email notifications.
-APP_BASE_URL=https://seedrlike.example.com # required trusted public HTTPS origin, no path/query/fragment
+APP_BASE_URL=https://seedrlike.example.com # required trusted public HTTPS origin, no path/query/fragment; must EXACTLY match the origin users browse in production (scheme+host+port). Deployment platforms (Coolify etc.) read their own env panel, not this file.
 RESEND_API_KEY=change-me # required Resend API key; whitespace is not allowed
 RESEND_FROM="Seedrlike <notifications@example.com>" # required mailbox on your Resend-verified domain; display name optional
 RESEND_TIMEOUT=10s # optional request timeout; 1s through 1m, default 10s

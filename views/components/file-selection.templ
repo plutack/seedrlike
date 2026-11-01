@@ -1,0 +1,65 @@
+package components
+
+import "fmt"
+import "strconv"
+
+type SelectableFile struct { Index int; Name string; Size int64 }
+type BatchResult struct { Line int; Message string; Failed bool }
+
+func humanBytes(n int64) string {
+ if n<1024 { return fmt.Sprintf("%d B",n) };v:=float64(n);units:=[]string{"B","KB","MB","GB","TB"};i:=0;for v>=1024&&i<len(units)-1{v/=1024;i++};return fmt.Sprintf("%.1f %s",v,units[i])
+}
+
+templ DownloadFeedback(message string, failed bool) {
+ <div role="status" class="rounded-box border border-base-300 bg-base-200 p-4 text-sm">
+  if failed {
+   <strong class="text-error">Could not add download. </strong>
+  }
+  { message }
+ </div>
+}
+
+templ BatchFeedback(results []BatchResult) {
+ <div role="status" class="rounded-box border border-base-300 p-4 text-sm space-y-2">
+  <h3 class="font-semibold">Batch import results</h3>
+  if len(results)==0 {
+   <p>No links were entered.</p>
+  }
+  for _, result := range results {
+   <p><span class="font-medium">Line { strconv.Itoa(result.Line) }: </span>
+   if result.Failed {
+    <span class="text-error">{ result.Message }</span>
+   } else {
+    <span>{ result.Message }</span>
+   }
+   </p>
+  }
+ </div>
+}
+
+templ FileSelection(magnet string, name string, zipped bool, files []SelectableFile) {
+ <form method="post" action="/downloads" hx-post="/downloads" hx-target="#download-response" hx-swap="innerHTML" class="rounded-box border border-base-300 bg-base-100 p-4 text-left" x-data="{ bytes: 0, count: 0, sync() { const checked = [...this.$root.querySelectorAll('input[name=files]:checked')]; this.count=checked.length; this.bytes=checked.reduce((n,c)=>n+Number(c.dataset.size),0); }, all(value) { this.$root.querySelectorAll('input[name=files]').forEach(c=>c.checked=value); this.sync(); } }" x-init="sync()">
+  <input type="hidden" name="magnet-link" value={ magnet }/>
+  <input type="hidden" name="selection" value="explicit"/>
+  <h3 class="font-semibold break-words">{ name }</h3>
+  <p class="text-sm text-base-content/70 mt-1">Choose the files to download. Only your selection will be uploaded.</p>
+  <div class="flex flex-wrap items-center gap-3 py-3 text-sm">
+   <button type="button" class="btn btn-ghost btn-xs" x-on:click="all(true)">Select all</button>
+   <button type="button" class="btn btn-ghost btn-xs" x-on:click="all(false)">Clear selection</button>
+   <span aria-live="polite" x-text="count + ' files · ' + (bytes / 1048576).toFixed(1) + ' MB selected'"></span>
+  </div>
+  <div class="max-h-96 overflow-y-auto divide-y divide-base-200">
+   for _, file := range files {
+    <label class="flex items-center gap-3 py-3 cursor-pointer">
+     <input type="checkbox" name="files" value={ strconv.Itoa(file.Index) } data-size={ strconv.FormatInt(file.Size,10) } checked class="checkbox checkbox-sm checkbox-primary" x-on:change="sync()"/>
+     <span class="min-w-0 flex-1 break-words text-sm">{ file.Name }</span>
+     <span class="text-xs whitespace-nowrap text-base-content/70">{ humanBytes(file.Size) }</span>
+    </label>
+   }
+  </div>
+  <div class="flex items-center justify-between gap-3 pt-4">
+   <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is-zipped" checked?={ zipped } class="checkbox checkbox-sm"/>Bundle as ZIP</label>
+   <button type="submit" class="btn btn-primary btn-sm" x-bind:disabled="count === 0">Download selected</button>
+  </div>
+ </form>
+}

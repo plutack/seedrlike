@@ -2,7 +2,7 @@ package ws
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -63,7 +63,7 @@ type WebsocketManager struct {
 func New() *WebsocketManager {
 	return &WebsocketManager{
 		clients:         make(map[*websocket.Conn]*string),
-		broadcast:       make(chan (Update)),
+		broadcast:       make(chan Update, 256),
 		register:        make(chan (Client)),
 		unregister:      make(chan (*websocket.Conn)),
 		progressData:    make(map[string]float64),
@@ -77,12 +77,19 @@ func (wm *WebsocketManager) Run() {
 		select {
 		case client := <-wm.register:
 			wm.clients[client.Conn] = client.UserID
+			wm.mu.Lock()
+			updates := make([]TorrentUpdate, 0, len(wm.activeDownloads))
 			for _, update := range wm.activeDownloads {
+				updates = append(updates, update)
+			}
+			wm.mu.Unlock()
+			for _, update := range updates {
 				// Filter: Public (UserID nil) OR Owned by user
 				if update.UserID == nil || (client.UserID != nil && *update.UserID == *client.UserID) {
+					_ = client.Conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 					err := client.Conn.WriteJSON(update)
 					if err != nil {
-						log.Println("Error sending active downloads:", err)
+						slog.Debug("websocket_write_failed", "operation", "initial_snapshot", "error_type", fmt.Sprintf("%T", err))
 						client.Conn.Close()
 						delete(wm.clients, client.Conn)
 					}
@@ -107,9 +114,10 @@ func (wm *WebsocketManager) Run() {
 				}
 
 				if allowed {
+					_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 					err := conn.WriteJSON(message)
 					if err != nil {
-						log.Println("WebSocket error:", err)
+						slog.Debug("websocket_write_failed", "operation", "broadcast", "error_type", fmt.Sprintf("%T", err))
 						conn.Close()
 						delete(wm.clients, conn)
 					}
@@ -120,9 +128,10 @@ func (wm *WebsocketManager) Run() {
 }
 
 func (wm *WebsocketManager) SendProgress(u Update) {
+	wm.mu.Lock()
 	switch v := u.(type) {
 	case TorrentUpdate:
-		if v.Status == "downloading" || v.Status == "pending" || v.Status == "uploading" || v.Status == "zipping" {
+		if v.Status == "started" || v.Status == "downloading" || v.Status == "pending" || v.Status == "uploading" || v.Status == "zipping" {
 			wm.activeDownloads[v.ID] = v
 		}
 		if v.Status == "completed" || v.Status == "failed" || v.Status == "stopped" {
@@ -131,7 +140,14 @@ func (wm *WebsocketManager) SendProgress(u Update) {
 	case RefreshUpdate:
 	}
 
-	wm.broadcast <- u
+	wm.mu.Unlock()
+	// Progress is a live snapshot, not durable work. A slow browser must never
+	// block downloads or uploads. Reconnection receives activeDownloads.
+	select {
+	case wm.broadcast <- u:
+	default:
+	}
+
 }
 
 func (wm *WebsocketManager) RegisterClient(c *websocket.Conn, userID *string) {

@@ -1,10 +1,20 @@
-GOOSE_DRIVER=mysql # see [goose documentation](https://pressly.github.io/goose/documentation/environment-variables/)
+GOOSE_DRIVER=mysql # optional Goose CLI setting; app runs embedded MySQL migrations automatically
 GOOSE_DBSTRING="mysql:mysql@tcp(127.0.0.1:3306)/seedrlike"
-GOOSE_MIGRATION_DIR=./internal/database/migrations/ # this is constant use to initialize the database tables and recordsj
+GOOSE_MIGRATION_DIR=./internal/database/migrations/ # optional CLI setting; startup uses migrations embedded in binary
 GOFILE_API_KEY= <xxxxxxxxxxxxxxx> # see gofile.io for api key
 JWT_SECRET= <change_me> # secret used to sign auth tokens
-ADMIN_USERNAME= <admin> # username allowed to wipe ALL stale content; others only clear their own
+ADMIN_USERNAME= <admin> # existing username allowed to view /admin and wipe ALL stale content
 TORRENTGO_URL=http://localhost:8080 # base URL of the torrentgo search microservice
 TORRENTGO_USERNAME=torrentgo # must match USERNAME on the torrentgo service
 TORRENTGO_PASSWORD=change-me # must match PASSWORD on the torrentgo service
-MAX_ACTIVE_DOWNLOAD_GB=50 # global budget (across all users) for concurrent downloads; torrents larger than this are rejected, the rest queue until space frees up
+MAX_ACTIVE_DOWNLOAD_GB=50 # global reserved disk budget; includes full torrent + selected ZIP allowance
+DOWNLOAD_DIR=./data/downloads # persist this directory across restarts; separate from Gofile storage
+LOG_LEVEL=info # slog JSON to stdout: debug, info, warn, error; debug includes progress logs
+
+# Optional email notifications.
+APP_BASE_URL=https://seedrlike.example.com # required trusted public HTTPS origin, no path/query/fragment
+RESEND_API_KEY=change-me # required Resend API key; whitespace is not allowed
+RESEND_FROM="Seedrlike <notifications@example.com>" # required mailbox on your Resend-verified domain; display name optional
+RESEND_TIMEOUT=10s # optional request timeout; 1s through 1m, default 10s
+# Development only: permits an HTTP APP_BASE_URL on localhost or a literal loopback IP.
+# EMAIL_ALLOW_INSECURE_LOCALHOST=true

@@ -3,7 +3,8 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -44,7 +45,7 @@ func (a *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		components.AuthError("User already exists").Render(r.Context(), w)
 		return
 	} else if err != sql.ErrNoRows {
-		log.Printf("Register check user error: %v", err)
+		slog.Error("Registration lookup failed", "operation", "register_user", "reason", "database_query_failed", "error_type", fmt.Sprintf("%T", err))
 		components.AuthError("Internal server error").Render(r.Context(), w)
 		return
 	}
@@ -67,23 +68,13 @@ func (a *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto login
-	token, err := auth.GenerateToken(userID)
-	if err != nil {
+	// Registration starts a normal browser session; remember-me is login-only.
+	if err := setAuthCookie(w, r, userID, false); err != nil {
 		components.AuthError("Error logging in").Render(r.Context(), w)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "token",
-		Value:    token,
-		Expires:  time.Now().Add(24 * time.Hour),
-		HttpOnly: true,
-		Path:     "/",
-	})
-
-	w.Header().Set("HX-Refresh", "true")
-	w.WriteHeader(http.StatusOK)
+	authSuccess(w, r)
 }
 
 func (a *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +91,7 @@ func (a *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		if err == sql.ErrNoRows {
 			components.AuthError("Invalid credentials").Render(r.Context(), w)
 		} else {
-			log.Printf("Login error: %v", err)
+			slog.Error("Login lookup failed", "operation", "login_user", "reason", "database_query_failed", "error_type", fmt.Sprintf("%T", err))
 			components.AuthError("Internal server error").Render(r.Context(), w)
 		}
 		return
@@ -111,30 +102,60 @@ func (a *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.GenerateToken(user.ID)
-	if err != nil {
+	if err := setAuthCookie(w, r, user.ID, r.FormValue("remember_me") == "on"); err != nil {
 		components.AuthError("Error logging in").Render(r.Context(), w)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "token",
-		Value:    token,
-		Expires:  time.Now().Add(24 * time.Hour),
-		HttpOnly: true,
-		Path:     "/",
-	})
+	authSuccess(w, r)
+}
 
-	w.Header().Set("HX-Refresh", "true")
-	w.WriteHeader(http.StatusOK)
+// setAuthCookie keeps cookie persistence and the signed token lifetime together.
+func setAuthCookie(w http.ResponseWriter, r *http.Request, userID string, remember bool) error {
+	duration := auth.SessionTokenDuration
+	if remember {
+		duration = auth.RememberTokenDuration
+	}
+	token, err := auth.GenerateTokenWithDuration(userID, duration)
+	if err != nil {
+		return err
+	}
+	cookie := &http.Cookie{
+		Name: "token", Value: token, Path: "/", HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+	}
+	if remember {
+		// Use the signed expiry, rather than a second clock reading.
+		claims, err := auth.ValidateToken(token)
+		if err != nil {
+			return err
+		}
+		cookie.Expires = claims.ExpiresAt.Time
+		cookie.MaxAge = int(duration / time.Second)
+	}
+	http.SetCookie(w, cookie)
+	return nil
+}
+
+func authSuccess(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Refresh", "true")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (a *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "token",
 		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour),
+		Expires:  time.Unix(1, 0),
+		MaxAge:   -1,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 		Path:     "/",
 	})
 

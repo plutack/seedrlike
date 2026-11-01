@@ -1,12 +1,22 @@
 package api
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
+	"github.com/plutack/seedrlike/internal/database/migrations"
+	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/plutack/seedrlike/internal/jobs"
+	"github.com/plutack/seedrlike/internal/notifications"
+	"github.com/plutack/seedrlike/internal/observability"
 
 	"github.com/anacrolix/torrent"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/plutack/go-gofile/api"
 	"github.com/plutack/seedrlike/internal/api/handlers"
@@ -33,6 +43,9 @@ type Server struct {
 	db               *sql.DB
 	dbQueries        *database.Queries
 	websocketManager *ws.WebsocketManager
+	previewClient    *torrent.Client
+	jobStore         *jobs.Store
+	dataDir          string
 }
 
 type Response struct {
@@ -40,9 +53,16 @@ type Response struct {
 	Status  bool   `json:"status"`
 }
 
-var storagePath = "/home/plutack/Downloads/seedrlike"
+func storageDirectory() (string, error) {
+	p := os.Getenv("DOWNLOAD_DIR")
+	if p == "" {
+		p = "./data/downloads"
+	}
+	return filepath.Abs(p)
+}
 
 func (s *Server) registerRoutes() {
+	s.router.Use(observability.HTTP)
 	// Static files first - NO Middleware
 	s.router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.FS(assets.Assets))))
 
@@ -50,8 +70,20 @@ func (s *Server) registerRoutes() {
 	// We use PathPrefix("/") but rely on order: assets are matched first.
 	apiRouter := s.router.PathPrefix("/").Subrouter()
 	apiRouter.Use(handlers.AuthMiddleware)
+	apiRouter.Use(handlers.SameOriginMiddleware)
+	apiRouter.Use(handlers.AdminContextMiddleware(s.dbQueries))
 
 	d := handlers.NewDownloadHandler(s.queue)
+	d.SetPreviewClient(s.previewClient)
+	settings := handlers.NewSettingsHandler(s.db)
+	admin := handlers.NewAdminHandler(s.dbQueries, s.queue, s.jobStore, s.dataDir)
+	apiRouter.HandleFunc("/settings", settings.Settings).Methods(GetMethod)
+	apiRouter.HandleFunc("/settings", settings.Save).Methods(PostMethod)
+	apiRouter.HandleFunc("/settings/verify", settings.Verify).Methods(GetMethod, PostMethod)
+	apiRouter.HandleFunc("/settings/test", settings.Test).Methods(PostMethod)
+	apiRouter.HandleFunc("/admin", admin.Dashboard).Methods(GetMethod)
+	apiRouter.HandleFunc("/downloads/preview", d.Preview).Methods(PostMethod)
+	apiRouter.HandleFunc("/downloads/batch", d.Batch).Methods(PostMethod)
 	authHandler := handlers.NewAuthHandler(s.dbQueries)
 	// Search talks to the external torrentgo service (TORRENTGO_URL, default
 	// http://localhost:8080). Credentials must match the service's USERNAME/PASSWORD.
@@ -87,8 +119,46 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func New() (*Server, error) {
+	// Schema must be ready before torrent clients, remote calls, or workers start.
+	cfg, err := mysql.ParseDSN(os.Getenv("GOOSE_DBSTRING"))
+	if err != nil {
+		slog.Error("startup_step_failed", "step", "database_configuration", "error_type", fmt.Sprintf("%T", err))
+		return nil, fmt.Errorf("database configuration: %w", err)
+	}
+	if cfg.DBName == "" {
+		return nil, fmt.Errorf("GOOSE_DBSTRING must select an existing database")
+	}
+	cfg.ParseTime = true
+	conn, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		return nil, err
+	}
+	ready := false
+	defer func() {
+		if !ready {
+			conn.Close()
+		}
+	}()
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancelStartup()
+	if err = conn.PingContext(startupCtx); err != nil {
+		slog.Error("startup_step_failed", "step", "database_connect", "error_type", fmt.Sprintf("%T", err))
+		return nil, fmt.Errorf("database: %w", err)
+	}
+	slog.Info("startup_step_completed", "step", "database_connect")
+	if err = migrations.Up(startupCtx, conn); err != nil {
+		return nil, err
+	}
+	dataDir, err := storageDirectory()
+	if err != nil {
+		return nil, err
+	}
+	if err = os.MkdirAll(dataDir, 0700); err != nil {
+		slog.Error("startup_step_failed", "step", "download_directory", "error_type", fmt.Sprintf("%T", err))
+		return nil, err
+	}
 	config := torrent.NewDefaultClientConfig()
-	config.DataDir = storagePath
+	config.DataDir = dataDir
 	c, err := client.New(config)
 	if err != nil {
 		return nil, err
@@ -107,17 +177,34 @@ func New() (*Server, error) {
 
 	userInfo, err := u.GetAccountID()
 	if err != nil {
+		slog.Error("startup_step_failed", "step", "gofile_account", "error_type", fmt.Sprintf("%T", err))
+		c.Close()
 		return nil, err
 	}
 	accountInfo, err := u.GetAccountInformation(userInfo.Data.ID)
 	if err != nil {
+		slog.Error("startup_step_failed", "step", "gofile_account_information", "error_type", fmt.Sprintf("%T", err))
+		c.Close()
 		return nil, err
 	}
-	conn, err := sql.Open("mysql", os.Getenv("GOOSE_DBSTRING")+"?parseTime=true")
-	if err != nil {
-		panic(err)
-	}
 	db := database.New(conn)
+	store := jobs.New(conn)
+	if err = q.Configure(store, dataDir, notifications.New(conn).Notify); err != nil {
+		c.Close()
+		conn.Close()
+		slog.Error("startup_step_failed", "step", "queue_recovery", "error_type", fmt.Sprintf("%T", err))
+		return nil, fmt.Errorf("recover jobs after schema migration: %w", err)
+	}
+	previewConfig := torrent.NewDefaultClientConfig()
+	previewConfig.DataDir = filepath.Join(dataDir, "metadata")
+	previewConfig.ListenPort = 0
+	previewConfig.NoUpload = true
+	previewClient, err := client.New(previewConfig)
+	if err != nil {
+		c.Close()
+		conn.Close()
+		return nil, err
+	}
 	r := accountInfo.Data.RootFolder
 	// make rootFolder public
 	u.UpdateContent(r, "public", true)
@@ -130,8 +217,12 @@ func New() (*Server, error) {
 		db:               conn,
 		dbQueries:        db,
 		websocketManager: wm,
+		previewClient:    previewClient,
+		jobStore:         store,
+		dataDir:          dataDir,
 	}
 	s.registerRoutes()
+	ready = true
 	go wm.Run()
 	go queue.ProcessTasks(s.torrentClient, s.queue, s.gofileClient, s.rootFolderID, s.dbQueries, wm)
 	return s, nil

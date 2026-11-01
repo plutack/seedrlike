@@ -66,7 +66,7 @@ templ ActiveDownloads() {
 
                         if (data.type === 'torrent update' ){
                             torrents[data.id] = data;
-                            if (data.status === 'completed' || data.status === 'failed') {
+                            if (data.status === 'completed' || data.status === 'failed' || data.status === 'stopped') {
                                 setTimeout(() => removeTorrent(data.id), 2000);
                             }
                             return;
@@ -154,6 +154,7 @@ templ ActiveDownloads() {
 							class="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
 							title="Cancel download"
 							aria-label="Cancel download"
+							x-show="['pending','started','downloading'].includes(torrent.status)"
 							x-on:click="askCancel(id, torrent.name)"
 						>
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

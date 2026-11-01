@@ -1,0 +1,113 @@
+package components
+
+templ AdminDashboard(data AdminDashboardData) {
+ <section class="mx-auto max-w-7xl px-4 py-8 sm:py-12 space-y-8" aria-labelledby="admin-title">
+  <a href="/" class="link text-sm">Back to your files</a>
+  <header class="flex flex-wrap items-start justify-between gap-4">
+   <div>
+    <h1 id="admin-title" class="text-3xl font-bold">Capacity dashboard</h1>
+    <p class="mt-2 text-base-content/70">Live capacity and current work. Administrator access only.</p>
+    <p class="mt-2 text-sm text-base-content/70">Snapshot: { data.UpdatedAt }</p>
+   </div>
+   <a href="/admin" class="btn btn-outline btn-sm">Refresh snapshot</a>
+  </header>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   <section class="card bg-base-100 border border-base-300" aria-labelledby="disk-title">
+    <div class="card-body">
+     <h2 id="disk-title" class="card-title">Data disk</h2>
+     if data.DiskAvailable {
+      <dl class="space-y-3 mt-2">
+       <div class="flex flex-wrap justify-between gap-2"><dt>Available space</dt><dd class="font-mono font-semibold">{ AdminDiskBytes(data.DiskFree) }</dd></div>
+       <div class="flex flex-wrap justify-between gap-2"><dt>Total filesystem capacity</dt><dd class="font-mono">{ AdminDiskBytes(data.DiskTotal) }</dd></div>
+      </dl>
+      <p class="text-sm text-base-content/70 mt-3">Measured on the configured data directory's filesystem. Available space excludes filesystem-reserved blocks.</p>
+      <p class="text-sm text-base-content/70 mt-2">Failed-job files are retained on this disk for manual reconciliation, even after leaving the queue. Inspect the jobs directory and remove reconciled artifacts if capacity runs low.</p>
+     } else {
+      <p role="status" class="mt-2">Disk capacity unavailable. The data directory could not be measured.</p>
+     }
+    </div>
+   </section>
+   <section class="card bg-base-100 border border-base-300" aria-labelledby="budget-title">
+    <div class="card-body">
+     <h2 id="budget-title" class="card-title">Download budget</h2>
+     if data.QueueAvailable {
+      <dl class="space-y-3 mt-2">
+       <div class="flex flex-wrap justify-between gap-2"><dt>Configured active budget</dt><dd class="font-mono font-semibold">{ AdminBytes(data.BudgetBytes) }</dd></div>
+       <div class="flex flex-wrap justify-between gap-2"><dt>Currently reserved</dt><dd class="font-mono">{ AdminBytes(data.ReservedBytes) }</dd></div>
+       <div class="flex flex-wrap justify-between gap-2"><dt>Download throughput</dt><dd class="font-mono">{ AdminSpeed(data.Throughput) }</dd></div>
+      </dl>
+      <p class="text-sm text-base-content/70 mt-3">Reservations are scheduling commitments, not disk usage. Throughput sums available download samples; upload speed is not measured.</p>
+     } else {
+      <p role="status" class="mt-2">Queue capacity unavailable. The download queue is not connected.</p>
+     }
+    </div>
+   </section>
+  </div>
+  <section class="card bg-base-100 border border-base-300" aria-labelledby="current-title">
+   <div class="card-body">
+    <h2 id="current-title" class="card-title">Current jobs</h2>
+    if !data.QueueAvailable {
+     <p role="status">Current jobs unavailable.</p>
+    } else {
+     <p>{ AdminQueueCount(len(data.Tasks)) } jobs in the queue snapshot.</p>
+     if len(data.Stages) > 0 {
+      <dl class="flex flex-wrap gap-3 my-3" aria-label="Queue stages">
+       for _, stage := range data.Stages {
+        <div class="badge badge-outline gap-2"><dt>{ stage.Name }</dt><dd>{ AdminQueueCount(stage.Count) }</dd></div>
+       }
+      </dl>
+     }
+     if len(data.Tasks) == 0 {
+      <div class="py-8 text-center"><p class="font-semibold">No current jobs</p><p class="text-sm text-base-content/70 mt-2">New downloads will appear here when they enter the queue.</p></div>
+     } else {
+      <div class="overflow-x-auto">
+       <table class="table table-sm">
+        <caption class="text-left text-sm text-base-content/70 pb-3">Current work only. Completed jobs are represented in the outcome counters below.</caption>
+        <thead><tr><th scope="col">Job / owner</th><th scope="col">Stage</th><th scope="col">Downloaded / size</th><th scope="col">Reserved</th><th scope="col">Download speed</th></tr></thead>
+        <tbody>
+         for _, task := range data.Tasks {
+          <tr>
+           <td><div class="font-medium break-all">{ AdminTaskName(task) }</div><div class="text-xs break-all mt-1">Job: { task.ID }</div><div class="text-xs break-all mt-1">Owner: { AdminOwner(task.UserID) }</div></td>
+           <td>{ task.Status }</td>
+           <td class="font-mono whitespace-nowrap">
+            { AdminBytes(task.Completed) } /
+            if task.Size > 0 {
+             <span>{ AdminBytes(task.Size) }</span>
+            } else {
+             <span>Awaiting metadata</span>
+            }
+           </td>
+           <td class="font-mono whitespace-nowrap">{ AdminBytes(task.Reserved) }</td>
+           <td class="font-mono whitespace-nowrap">{ AdminSpeed(task.Speed) }</td>
+          </tr>
+         }
+        </tbody>
+       </table>
+      </div>
+     }
+    }
+   </div>
+  </section>
+  <section class="card bg-base-100 border border-base-300" aria-labelledby="outcomes-title">
+   <div class="card-body">
+    <h2 id="outcomes-title" class="card-title">Outcomes in the last 30 days</h2>
+    <p class="text-sm text-base-content/70">Persisted aggregate counters, not individual job history. Bytes reflect recorded job sizes, not measured network traffic.</p>
+    if !data.MetricsAvailable {
+     <p role="status" class="mt-3">Outcome counters unavailable. The metrics store could not be read.</p>
+    } else {
+     <div class="overflow-x-auto mt-3">
+      <table class="table table-sm">
+       <thead><tr><th scope="col">Outcome</th><th scope="col">Jobs</th><th scope="col">Recorded size</th></tr></thead>
+       <tbody>
+        for _, outcome := range data.Outcomes {
+         <tr><th scope="row" class="font-medium">{ outcome.Status }</th><td class="font-mono">{ AdminCount(outcome.Jobs) }</td><td class="font-mono">{ AdminBytes(outcome.Bytes) }</td></tr>
+        }
+       </tbody>
+      </table>
+     </div>
+     <p class="text-sm text-base-content/70 mt-2">Zero means no recorded outcomes in this window. Counters begin when persistent job tracking is enabled.</p>
+    }
+   </div>
+  </section>
+ </section>
+}

@@ -39,6 +39,41 @@ Seedrlike is inspired by [Seedr](https://seedr.cc). This allows the user to add 
 ##  Features
 - Initiate downloads using magnet links
 - Websocket for real time updates (tracking download progress and time to complete)
+- Select individual torrent files before downloading, with selected size totals
+- Batch import magnet links with per-line validation and active-duplicate detection
+- Durable MySQL queue with partial-download verification after restart
+- Search your accessible file library and sort by name, size, or date
+- Verified email notifications, configurable under Settings
+- Administrator-only capacity dashboard and aggregate 30-day outcome counters
+
+### Feature configuration and deployment
+
+The application automatically applies pending embedded Goose migrations on startup, before starting torrent clients, remote API calls, workers, or HTTP routes. No separate Goose CLI installation or manual `goose up` is needed. Existing `goose_db_version` history is respected. A database-scoped MySQL advisory lock serializes startup migrations (60-second lock wait, five-minute startup deadline). Migration failures stop startup rather than running against an incompatible schema.
+
+Create the database itself first and set `GOOSE_DBSTRING` to a user with the required schema-change permissions (`CREATE`, `ALTER`, `INDEX`, and normal data access). The app creates tables, not the database or DB account. Back up production databases before deploying schema changes. MySQL DDL is not fully transactional: after a failure, inspect partially applied changes and migration history before restarting; the app does not silently mark failed migrations as applied or automatically roll back. Goose CLI remains available for operator-managed inspection/rollback. No download history screen or manual retry feature is added.
+
+- `DOWNLOAD_DIR` defaults to `./data/downloads`. Keep it on persistent storage alongside a persistent MySQL database. New jobs use isolated UUID directories; old downloads from the former hardcoded location are not automatically imported.
+- `MAX_ACTIVE_DOWNLOAD_GB` controls the shared reservation budget. Reservations conservatively cover the full torrent plus ZIP allowance, including unselected boundary-piece data. Only selected files are staged and uploaded.
+- Adding, previewing, importing, and cancelling downloads requires login. Users may cancel only their own jobs, before zipping/uploading begins.
+- Individual magnets and torrent search results default to **Download all**. **Choose files** is an optional secondary action, with all files initially selected. Batch import accepts one magnet per line (up to 50), downloads all files, and reports rejected entries independently. The queue currently accepts up to 10 unfinished jobs globally.
+- Login offers **Remember me** for a 30-day persistent session. Without it, the login cookie lasts for the browser session and the token expires after 24 hours. Keep `JWT_SECRET` strong and unchanged across restarts/replicas; changing it invalidates existing logins. Logout clears the browser cookie.
+- `/settings` lets each user set a notification email separately from their username, verify it, choose ready/failed notifications, and send a test message. Verification links expire after 30 minutes and require a signed-in confirmation. Verification/test requests are rate-limited.
+- Email delivery uses the official Resend Go SDK v4 and its fixed HTTPS API endpoint (`https://api.resend.com`), not SMTP. Set required `APP_BASE_URL` (a trusted administrator-controlled HTTPS origin, with no credentials, path other than `/`, query, or fragment), `RESEND_API_KEY` (no whitespace), and `RESEND_FROM` (a mailbox on your Resend-verified domain, optionally with a display name). Optional `RESEND_TIMEOUT` defaults to `10s` and must be between `1s` and `1m`. See [the example configuration](<.envrc.example>) and [notification documentation](<internal/notifications/README.md>). For development only, optional boolean `EMAIL_ALLOW_INSECURE_LOCALHOST=true` permits an HTTP application origin on localhost or a literal loopback IP; it never changes the Resend HTTPS endpoint or disables certificate verification. Old `SMTP_*` variables are no longer used. Follow [Resend's Go SDK guide](https://resend.com/docs/send-with-go) and [verified-domain documentation](https://resend.com/docs/dashboard/domains/introduction).
+- `ADMIN_USERNAME` designates an existing account that can access `/admin`. The server checks authorization before exposing global jobs, filesystem capacity, reservations, or outcome counters. Normal users see only accessible library content and job updates.
+
+**Restart safety:** queued and downloading jobs are restored and partial torrent data is rechecked. Zipping can be rebuilt. A job interrupted during remote upload is marked failed rather than automatically uploaded again: Gofile uploads are not idempotent, and remote files may already exist. Failed local artifacts remain under `DOWNLOAD_DIR/jobs/<job UUID>` for operator inspection and manual removal after reconciliation; this can consume disk space. Successful/cancelled artifacts are cleaned up. Use a single application worker process per database/data directory.
+
+**Deletion safety:** stale cleanup requires Gofile's overall response and each requested item's status to confirm success before removing database records. A transport error, partial failure, or incomplete response stops cleanup and retains all records. Remote deletion is not transactional: some items may already have been removed when a failure occurs. Unconfirmed/already-missing responses require operator reconciliation rather than silently discarding references.
+
+**Storage privacy:** account ownership restricts app listings, job updates, and mutations. The existing Gofile integration still publishes folders/direct download links, including the shared root; this is not private encrypted storage. Do not upload sensitive files or treat app login as a Gofile access-control boundary.
+
+**Notifications:** ready emails are triggered only after successful remote upload, not torrent completion. Delivery is best effort with bounded Resend API request timeouts, not a durable email outbox. Actual sending is blocked in Go test binaries; injected fake HTTP transports can test SDK payloads offline.
+
+### Logging
+
+Application logs use Go `log/slog` with JSON output to stdout. `LOG_LEVEL` accepts `debug`, `info` (default), `warn`, or `error`; an invalid value stops startup. Normal logs include startup/migration steps, download job lifecycle and stage changes, capacity waits, terminal outcomes, and actionable reason codes. Upload progress and routine health/static/WebSocket chatter are DEBUG to avoid flooding normal logs.
+
+HTTP logs include generated `request_id` (also returned as `X-Request-ID`), method, route template, response status, bytes, and duration. They intentionally omit query strings, bodies, cookies, authorization headers, client IPs, and user-supplied request IDs. Job logs use `job_id`, stage/status, selected/reserved bytes, and safe failure reason codes. Errors record their type rather than raw external error text, which could expose credentials, tokens, email addresses, filenames, or paths. Third-party dependency logs may retain their own logging behavior.
 
 ---
 
@@ -96,7 +131,7 @@ Install seedrlike using one of the following methods:
 
 3. Install the project dependencies:
 
-install `goose` to initialize the database after setting the enviroment variables in `envrc.example`. This can be set depending on the user. For local development, direnv is recommended. To install, see [goose documentation](https://pressly.github.io/goose/installation/)
+Create your MySQL database and set the environment variables shown in `.envrc.example`. The application embeds and applies pending migrations automatically at startup. For local development, direnv is recommended. The Goose CLI is optional for database inspection and operator-managed rollback.
 
 **Using `go modules`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
 
@@ -114,7 +149,7 @@ install `goose` to initialize the database after setting the enviroment variable
 
 
 ###  Usage
-Before running the seedrlike binary run `goose up` to initialize the tables in the specified database
+On startup, Seedrlike connects to the configured database and applies pending migrations automatically. Startup stops if migration fails.
 Run seedrlike using the following command:
 **Using `go modules`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
 

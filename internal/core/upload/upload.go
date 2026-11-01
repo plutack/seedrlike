@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -79,7 +79,7 @@ func returnPercentageCompleted(c, t int64) float64 {
 	percentage := (float64(c) / float64(t)) * 100
 	percentage = min(percentage, 100)
 	sizeInMB := float64(t) / 1000000.0
-	log.Printf("%.2f%% completed out of %.2f MB", percentage, sizeInMB)
+	slog.Debug("Upload progress", "operation", "upload_progress", "percent", percentage, "total_mb", sizeInMB)
 	return math.Round(percentage*100) / 100
 }
 
@@ -204,7 +204,6 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 	// For the database entry:
 	// - Otherwise, use the provided parent ID
 	parentID := parentFolderID
-	fmt.Printf("calling inside create folder: this is the the parent folder ID: %s ", parentFolderID)
 	if parentFolderID == rootFolderID && hash != "" {
 		parentID = RootFolderPlaceholder
 	}
@@ -225,8 +224,7 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 		ParentFolderID: parentID,
 		UserID:         userIDParams,
 	}
-	log.Printf("Creating folder in DB: ID=%s, Name=%s, Parent=%v, Hash=%s, Size=%d, UserID=%v\n",
-		info.Data.ID, folderName, parentFolderID, hash, size, userID)
+	slog.Debug("Persisting upload folder", "operation", "create_upload_folder", "job_id", hash, "size_bytes", size)
 
 	if err := db.CreateFolder(context.Background(), folderDetails); err != nil {
 		return "", fmt.Errorf("database error: %w", err)
@@ -235,10 +233,22 @@ func createFolder(folderName string, rootFolderID string, parentFolderID string,
 	return info.Data.ID, nil
 }
 
+// Validate the external response before indexing server metadata. A successful
+// HTTP upload can still return malformed/incomplete JSON; fail the job safely.
+func validateUploadServers(servers []string) error {
+	if len(servers) == 0 || strings.TrimSpace(servers[0]) == "" {
+		return fmt.Errorf("upload response has no storage server")
+	}
+	return nil
+}
+
 func uploadFile(fullFilePath string, parentFolderID string, rootFolderID string, uploadClient *api.Api, db *database.Queries, server string, updateCallback progressCallbackFunc, userID *string) error {
 	info, err := uploadClient.UploadFile(server, fullFilePath, parentFolderID, updateCallback)
 
 	if err != nil {
+		return err
+	}
+	if err := validateUploadServers(info.Data.Servers); err != nil {
 		return err
 	}
 	folderID := info.Data.ParentFolder
@@ -435,7 +445,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 
 	if !info.IsDir() {
 		// If it's a single file, upload it directly
-		log.Printf("Uploading single file: %s to root folder: %s\n", folderPath, rootFolderID)
+		slog.Info("Uploading single file", "operation", "upload_file", "job_id", hash)
 		return uploadFile(folderPath, rootFolderID, rootFolderID, uploadClient, db, server, progressCallback, userID)
 	}
 
@@ -471,8 +481,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 	totalUploadSize := dirSize
 	var bytesUploadedSoFar int64 = 0
 
-	log.Printf("Creating initial folder: %s under parent: %s (Size: %d bytes)\n",
-		baseName, rootFolderID, dirSize)
+	slog.Info("Creating upload folder", "operation", "create_upload_folder", "job_id", hash, "size_bytes", dirSize)
 
 	initialFolderID, err := createFolder(baseName, rootFolderID, rootFolderID, uploadClient, db, hash, dirSize, userID)
 	if err != nil {
@@ -499,8 +508,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 			}
 
 			dirSize := dirSizes[path]
-			log.Printf("Creating subfolder: %s under parent: %s (Size: %d bytes)\n",
-				d.Name(), parentID, dirSize)
+			slog.Debug("Creating upload subfolder", "operation", "create_upload_subfolder", "job_id", hash, "size_bytes", dirSize)
 
 			newFolderID, createErr := createFolder(d.Name(), rootFolderID, parentID, uploadClient, db, "", dirSize, userID)
 			if createErr != nil {
@@ -514,7 +522,7 @@ func SendTorrentToServer(folderPath string, uploadClient *api.Api, rootFolderID 
 				return fmt.Errorf("parent folder ID not found for file: %s", path)
 			}
 
-			log.Printf("Uploading file: %s to folder: %s\n", path, parentID)
+			slog.Debug("Uploading file", "operation", "upload_file", "job_id", hash)
 
 			fileInfo, err := d.Info()
 			if err != nil {

@@ -40,11 +40,28 @@ func CheckPasswordHash(password, hash string) bool {
 	return err == nil
 }
 
+const (
+	SessionTokenDuration  = 24 * time.Hour
+	RememberTokenDuration = 30 * 24 * time.Hour
+)
+
+// GenerateToken preserves the default, non-renewing 24-hour token lifetime.
 func GenerateToken(userID string) (string, error) {
-	expirationTime := time.Now().Add(24 * time.Hour)
+	return GenerateTokenWithDuration(userID, SessionTokenDuration)
+}
+
+// GenerateTokenWithDuration issues a fixed-lifetime token. Validating a token
+// never extends its expiry. JWT_SECRET must remain stable across server restarts.
+func GenerateTokenWithDuration(userID string, duration time.Duration) (string, error) {
+	if duration <= 0 {
+		return "", errors.New("token duration must be positive")
+	}
+	now := time.Now()
+	expirationTime := now.Add(duration)
 	claims := &Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},
 	}
@@ -58,7 +75,7 @@ func ValidateToken(tokenString string) (*Claims, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired(), jwt.WithIssuedAt())
 
 	if err != nil {
 		return nil, err

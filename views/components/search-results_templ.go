@@ -84,7 +84,7 @@ func SearchResults(results []search.Result, matchedQuery string, failed bool) te
 				return templ_7745c5c3_Err
 			}
 			for _, r := range results {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"search-row flex items-center gap-3 px-3 py-2 hover:bg-base-200/40 transition-colors\" data-source=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"search-row flex flex-wrap items-center gap-2 px-3 py-3 hover:bg-base-200/40 transition-colors sm:flex-nowrap\" data-source=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -136,7 +136,7 @@ func SearchResults(results []search.Result, matchedQuery string, failed bool) te
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><div class=\"min-w-0 flex-1\"><p class=\"truncate text-sm\" title=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><div class=\"min-w-0 w-full sm:flex-1\"><p class=\"truncate text-sm\" title=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -237,7 +237,7 @@ func SearchResults(results []search.Result, matchedQuery string, failed bool) te
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\">Download all</button> <button type=\"button\" class=\"btn btn-ghost btn-xs flex-shrink-0 whitespace-nowrap\" hx-post=\"/downloads/preview\" hx-target=\"#download-response\" hx-swap=\"innerHTML\" hx-vals=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\">Download all</button> <button type=\"button\" class=\"btn btn-ghost btn-xs flex-shrink-0 whitespace-nowrap\" hx-post=\"/downloads/preview\" hx-target=\"#file-picker-content\" hx-swap=\"innerHTML\" hx-vals=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

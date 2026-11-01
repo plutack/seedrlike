@@ -112,19 +112,27 @@ func (h *SettingsHandler) Save(w http.ResponseWriter, r *http.Request) {
 	if id == "" || !settingsPost(w, r) {
 		return
 	}
+	action := r.PostForm.Get("action")
 	email := r.PostForm.Get("email")
-	if err := h.service.Save(r.Context(), id, email, r.PostForm.Get("completed") == "on", r.PostForm.Get("failed") == "on"); err != nil {
+	completed, failed := r.PostForm.Get("completed") == "on", r.PostForm.Get("failed") == "on"
+	if action == "unset" {
+		email, completed, failed = "", false, false
+	}
+	if err := h.service.Save(r.Context(), id, email, completed, failed); err != nil {
 		slog.Error("Notification settings save failed", "operation", "save_notification_settings", "reason", "settings_save_failed", "error_type", fmt.Sprintf("%T", err))
 		h.render(w, r, id, "Unable to save. Enter a valid email address and try again.", true, http.StatusBadRequest)
 		return
 	}
-	message := "Your notification preferences have been saved."
-	if r.PostForm.Get("action") == "verify" {
+	message := "Saved."
+	if action == "unset" {
+		message = "Email unset. Notifications disabled."
+	}
+	if action == "verify" {
 		if err := h.service.RequestVerification(r.Context(), id); err != nil {
 			h.deliveryError(w, r, id, err)
 			return
 		}
-		message = "Preferences saved. Check your inbox for a verification link; it expires in 30 minutes."
+		message = "Saved. Check your inbox to verify your email."
 	}
 	h.render(w, r, id, message, false, http.StatusOK)
 }
@@ -166,7 +174,7 @@ func (h *SettingsHandler) Verify(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	h.render(w, r, id, "Email verified. Your selected download updates are now enabled.", false, http.StatusOK)
+	h.render(w, r, id, "Email verified.", false, http.StatusOK)
 }
 func (h *SettingsHandler) Test(w http.ResponseWriter, r *http.Request) {
 	if !settingsMethod(w, r, http.MethodPost) {
@@ -180,12 +188,12 @@ func (h *SettingsHandler) Test(w http.ResponseWriter, r *http.Request) {
 		h.deliveryError(w, r, id, err)
 		return
 	}
-	h.render(w, r, id, "Test email sent. Check your inbox (and your spam folder).", false, http.StatusOK)
+	h.render(w, r, id, "Test email sent.", false, http.StatusOK)
 }
 func (h *SettingsHandler) deliveryError(w http.ResponseWriter, r *http.Request, id string, err error) {
 	if errors.Is(err, notifications.ErrRateLimited) {
 		w.Header().Set("Retry-After", "60")
-		h.render(w, r, id, err.Error(), true, http.StatusTooManyRequests)
+		h.render(w, r, id, "Too many requests. Try again shortly.", true, http.StatusTooManyRequests)
 		return
 	}
 	if errors.Is(err, notifications.ErrUnverified) {
@@ -193,5 +201,5 @@ func (h *SettingsHandler) deliveryError(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	slog.Error("Notification delivery failed", "operation", "send_notification", "reason", "delivery_failed", "error_type", fmt.Sprintf("%T", err))
-	h.render(w, r, id, "Preferences are saved, but the email could not be sent. Check your address or contact your administrator, then try again in a minute.", true, http.StatusServiceUnavailable)
+	h.render(w, r, id, "Saved, but email could not be sent. Try again later.", true, http.StatusServiceUnavailable)
 }

@@ -92,7 +92,9 @@ func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Reque
 		components.DownloadFeedback(publicQueueError(err), true).Render(r.Context(), w)
 		return
 	}
-	components.DownloadFeedback("Download added to the queue.", false).Render(r.Context(), w)
+	w.Header().Set("HX-Retarget", "#download-response")
+	w.Header().Set("HX-Trigger", "download-queued")
+	components.DownloadFeedback("Added to queue.", false).Render(r.Context(), w)
 }
 func (d *DownloadHandler) StopDownload(w http.ResponseWriter, r *http.Request) {
 	userID := requireDownloadUser(w, r)
@@ -121,6 +123,7 @@ func (d *DownloadHandler) Batch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var results []components.BatchResult
+	accepted := make([]string, 0, len(lines))
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -130,9 +133,15 @@ func (d *DownloadHandler) Batch(w http.ResponseWriter, r *http.Request) {
 		message := "Added to queue"
 		if err != nil {
 			message = publicQueueError(err)
+		} else {
+			accepted = append(accepted, line)
 		}
 		results = append(results, components.BatchResult{Line: i + 1, Message: message, Failed: err != nil})
 	}
+	// Remove only accepted entries from the client list. Rejected entries remain
+	// editable/removable, so retrying a partial import cannot enqueue successes twice.
+	event, _ := json.Marshal(map[string]any{"batch-imported": map[string]any{"accepted": accepted}})
+	w.Header().Set("HX-Trigger", string(event))
 	components.BatchFeedback(results).Render(r.Context(), w)
 }
 func (d *DownloadHandler) Preview(w http.ResponseWriter, r *http.Request) {

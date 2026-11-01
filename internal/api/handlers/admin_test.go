@@ -152,7 +152,7 @@ func TestDashboardReadsActualFilesystem(t *testing.T) {
 	if strings.Contains(response.Body.String(), "Disk capacity unavailable") {
 		t.Fatal("existing filesystem should be measurable")
 	}
-	if !strings.Contains(response.Body.String(), "Total filesystem capacity") {
+	if !strings.Contains(response.Body.String(), "Disk available") || !strings.Contains(response.Body.String(), " total</p>") {
 		t.Fatal("missing actual capacity")
 	}
 }

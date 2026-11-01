@@ -2,11 +2,18 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/plutack/seedrlike/internal/notifications"
 )
 
 func TestNotificationEndpointsRequireOwner(t *testing.T) {
@@ -88,6 +95,83 @@ func TestSettingsCSRFCookieTransportSecurity(t *testing.T) {
 		})
 	}
 }
+
+func TestUnsetNotificationSettings(t *testing.T) {
+	state := &settingsSQL{}
+	db := sql.OpenDB(settingsConnector{state})
+	t.Cleanup(func() { _ = db.Close() })
+	h := NewSettingsHandler(db)
+	csrf := strings.Repeat("A", 43)
+	form := url.Values{"csrf": {csrf}, "action": {"unset"}, "email": {"not a valid email"}, "completed": {"on"}, "failed": {"on"}, "User_ID": {"other-owner"}}
+	r := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(&http.Cookie{Name: "seedrlike_settings_csrf", Value: csrf})
+	r = r.WithContext(context.WithValue(r.Context(), UserIDKey, "owner"))
+	w := httptest.NewRecorder()
+	h.Save(w, r)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Email unset. Notifications disabled.") {
+		t.Fatalf("unset: status %d, body %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(state.query, "INSERT INTO Notification_Settings") || !reflect.DeepEqual(state.args, []driver.NamedValue{{Ordinal: 1, Value: "owner"}, {Ordinal: 2, Value: ""}, {Ordinal: 3, Value: false}, {Ordinal: 4, Value: false}}) {
+		t.Fatalf("unset must clear address and preferences through owner-scoped Save: %s, %+v", state.query, state.args)
+	}
+}
+
+func TestUnsetRequiresCSRF(t *testing.T) {
+	h := NewSettingsHandler(nil)
+	r := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader("action=unset"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(context.WithValue(r.Context(), UserIDKey, "owner"))
+	w := httptest.NewRecorder()
+	h.Save(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("unset without CSRF: %d", w.Code)
+	}
+}
+
+func TestSettingsRateLimitMessage(t *testing.T) {
+	db := sql.OpenDB(settingsConnector{&settingsSQL{}})
+	t.Cleanup(func() { _ = db.Close() })
+	h := NewSettingsHandler(db)
+	w := httptest.NewRecorder()
+	h.deliveryError(w, httptest.NewRequest(http.MethodPost, "/settings", nil), "owner", notifications.ErrRateLimited)
+	if w.Code != http.StatusTooManyRequests || w.Header().Get("Retry-After") != "60" || !strings.Contains(w.Body.String(), "Too many requests. Try again shortly.") || strings.Contains(w.Body.String(), notifications.ErrRateLimited.Error()) {
+		t.Fatalf("unexpected rate-limit response: %d %s", w.Code, w.Body.String())
+	}
+}
+
+// A connector records Save arguments without requiring a database or sending mail.
+type settingsSQL struct {
+	query string
+	args  []driver.NamedValue
+}
+type settingsConnector struct{ state *settingsSQL }
+type settingsDriver struct{}
+type settingsConn struct{ state *settingsSQL }
+type settingsRows struct{}
+
+func (c settingsConnector) Connect(context.Context) (driver.Conn, error) {
+	return settingsConn{c.state}, nil
+}
+func (settingsConnector) Driver() driver.Driver         { return settingsDriver{} }
+func (settingsDriver) Open(string) (driver.Conn, error) { return nil, errors.New("use connector") }
+func (settingsConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("unexpected prepare")
+}
+func (settingsConn) Close() error              { return nil }
+func (settingsConn) Begin() (driver.Tx, error) { return nil, errors.New("unexpected transaction") }
+func (c settingsConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	c.state.query, c.state.args = query, append([]driver.NamedValue(nil), args...)
+	return driver.RowsAffected(1), nil
+}
+func (settingsConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return settingsRows{}, nil
+}
+func (settingsRows) Columns() []string {
+	return []string{"Email", "Verified_At", "Notify_Completed", "Notify_Failed"}
+}
+func (settingsRows) Close() error              { return nil }
+func (settingsRows) Next([]driver.Value) error { return io.EOF }
 
 func TestSettingsRejectWrongMethod(t *testing.T) {
 	h := NewSettingsHandler(nil)

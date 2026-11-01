@@ -1,3 +1,53 @@
+// File selection is local until explicit submission; HTMX owns the upload.
+window.torrentUpload = function () {
+    return {
+        file: null, error: '', busy: false, dragging: false, percent: 0,
+        size(bytes) { return bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB'; },
+        clearFeedback() { this.$root.querySelector('#torrent-upload-response').replaceChildren(); },
+        choose(files) {
+            if (this.busy) return;
+            this.error = ''; this.clearFeedback();
+            if (!files || !files.length) return;
+            const file = files[0];
+            if (files.length !== 1 || !/\.torrent$/i.test(file.name) || !file.size || file.size > 4 * 1024 * 1024) {
+                this.file = null; this.$refs.file.value = '';
+                this.error = 'Choose one non-empty .torrent file up to 4 MB.'; return;
+            }
+            this.file = file; this.percent = 0;
+        },
+        drop(event) {
+            this.dragging = false;
+            if (this.busy) return;
+            const files = event.dataTransfer.files;
+            this.choose(files);
+            if (this.file) {
+                const transfer = new DataTransfer(); transfer.items.add(this.file);
+                this.$refs.file.files = transfer.files;
+            }
+        },
+        remove() {
+            if (this.busy) return;
+            this.file = null; this.$refs.file.value = ''; this.error = ''; this.percent = 0;
+            this.clearFeedback(); this.$refs.file.focus();
+        },
+        start(event) {
+            if (!this.file || this.busy) { event.preventDefault(); return; }
+            this.busy = true; this.percent = 0; this.error = ''; this.clearFeedback();
+        },
+        progress(event) {
+            if (this.busy && event.detail.total > 0) this.percent = Math.min(100, Math.round(event.detail.loaded / event.detail.total * 100));
+        },
+        finish(event) {
+            this.busy = false;
+            if (event.detail.failed) this.error = 'Upload failed. Your file is still selected. Try again.';
+        },
+        accepted() {
+            this.file = null; this.$refs.file.value = ''; this.error = ''; this.percent = 0;
+            // Keep the user's ZIP preference for the next upload.
+        }
+    };
+};
+
 // Native dialog coordinates HTMX metadata loading and cancellation.
 (function () {
     let previewXHR = null;

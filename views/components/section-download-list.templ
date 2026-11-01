@@ -71,7 +71,7 @@ templ DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConte
 					}
 				</div>
 			</div>
-			<form action={ templ.SafeURL("/contents/" + folderID) } method="get" hx-get={ "/contents/" + folderID } hx-target="#content-list" hx-swap="outerHTML" hx-push-url="true" class="flex flex-wrap items-end gap-3 mb-4" role="search" aria-label="Search your library">
+			<form action={ templ.SafeURL("/contents/" + folderID) } method="get" hx-get={ "/contents/" + folderID } hx-target="#content-list" hx-swap="outerHTML" hx-push-url="true" hx-trigger="submit, input changed delay:500ms from:#library-query, change[target.tagName === 'SELECT']" hx-sync="this:replace" hx-indicator="#library-search-indicator" class="flex flex-wrap items-end gap-3 mb-4" role="search" aria-label="Search your library">
 				<div class="flex-1 min-w-48">
 					<label for="library-query" class="block text-sm font-medium mb-1">Search library</label>
 					<input id="library-query" type="search" name="q" value={ options.Query } maxlength="200" placeholder="Find files and folders in your library" class="input input-bordered input-sm w-full"/>
@@ -91,7 +91,7 @@ templ DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConte
 						<option value="desc" selected={ options.Order == "desc" }>Descending</option>
 					</select>
 				</div>
-				<button type="submit" class="btn btn-primary btn-sm">Apply</button>
+				<span id="library-search-indicator" class="htmx-indicator loading loading-spinner loading-sm self-center" role="status" aria-label="Searching library"></span>
 			</form>
 			if options.Query != "" {
 				<div class="flex items-center justify-between gap-3 mb-3 text-sm" role="status">

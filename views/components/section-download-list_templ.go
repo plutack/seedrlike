@@ -149,7 +149,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" class=\"flex flex-wrap items-end gap-3 mb-4\" role=\"search\" aria-label=\"Search your library\"><div class=\"flex-1 min-w-48\"><label for=\"library-query\" class=\"block text-sm font-medium mb-1\">Search library</label> <input id=\"library-query\" type=\"search\" name=\"q\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-push-url=\"true\" hx-trigger=\"submit, input changed delay:500ms from:#library-query, change[target.tagName === &#39;SELECT&#39;]\" hx-sync=\"this:replace\" hx-indicator=\"#library-search-indicator\" class=\"flex flex-wrap items-end gap-3 mb-4\" role=\"search\" aria-label=\"Search your library\"><div class=\"flex-1 min-w-48\"><label for=\"library-query\" class=\"block text-sm font-medium mb-1\">Search library</label> <input id=\"library-query\" type=\"search\" name=\"q\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -227,7 +227,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">Descending</option></select></div><button type=\"submit\" class=\"btn btn-primary btn-sm\">Apply</button></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">Descending</option></select></div><span id=\"library-search-indicator\" class=\"htmx-indicator loading loading-spinner loading-sm self-center\" role=\"status\" aria-label=\"Searching library\"></span></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

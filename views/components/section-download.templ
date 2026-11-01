@@ -94,19 +94,7 @@ templ Download() {
 					>Choose files</button>
 				</div>
 			</form>
-			<details class="mt-3 rounded-box border border-base-300 p-3">
- <summary class="cursor-pointer text-sm font-medium">Upload a .torrent file</summary>
- <form method="post" action="/downloads/torrent" enctype="multipart/form-data" hx-post="/downloads/torrent" hx-encoding="multipart/form-data" hx-target="#torrent-upload-response" hx-swap="innerHTML" hx-disabled-elt="find button" class="mt-3 space-y-3" x-data="{ filename: '' }" x-on:torrent-uploaded.window="$el.reset(); filename = ''">
-  <label for="torrent-file" class="block text-sm font-medium">Torrent file</label>
-  <input id="torrent-file" type="file" name="torrent-file" accept=".torrent,application/x-bittorrent" required class="file-input file-input-bordered w-full min-w-0" aria-describedby="torrent-file-help" x-on:change="filename = $event.target.files[0]?.name || ''"/>
-  <p id="torrent-file-help" class="text-xs text-base-content/70">Up to 4 MB · Downloads all files</p>
-  <div class="flex flex-wrap items-center justify-between gap-3">
-   <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is-zipped" checked class="checkbox checkbox-sm"/>ZIP download</label>
-   <button class="btn btn-primary btn-sm" type="submit" x-bind:disabled="!filename">Download torrent</button>
-  </div>
- </form>
- <div id="torrent-upload-response" class="mt-3" aria-live="polite"></div>
- </details>
+			@TorrentUpload()
 			@FilePickerDialog()
 			<!--
 				Filter bar + results live in one Alpine scope. Filters run

@@ -13,7 +13,7 @@ func TestTorrentUploadReplacesBatchImportAndRetainsModalPreview(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := out.String()
-	for _, want := range []string{`name="torrent-file"`, `type="file"`, `hx-post="/downloads/torrent"`, `hx-encoding="multipart/form-data"`, `torrent-uploaded.window`, "Download torrent", `hx-target="#file-picker-content"`, `id="file-picker"`, `aria-labelledby="file-picker-title"`, `id="file-picker-loading"`, `loading-spinner`} {
+	for _, want := range []string{`name="torrent-file"`, `type="file"`, `hx-post="/downloads/torrent"`, `hx-encoding="multipart/form-data"`, `torrent-uploaded.window`, "Add to queue", `x-data="torrentUpload()"`, `x-on:drop.prevent`, `aria-label="Torrent file upload progress"`, `id="torrent-file-error"`, `x-bind:aria-busy="busy"`, `hx-target="#file-picker-content"`, `id="file-picker"`, `aria-labelledby="file-picker-title"`, `id="file-picker-loading"`, `loading-spinner`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing batch/modal behavior %s", want)
 		}

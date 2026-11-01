@@ -1,35 +1,4 @@
-// Kept framework-light: Alpine owns the batch list, HTMX owns requests,
-// and a native dialog provides keyboard focus trapping and Escape handling.
-window.magnetBatch = function () {
-    return {
-        draft: '', links: [], error: '', busy: false,
-        label(link) {
-            try {
-                const params = new URL(link).searchParams;
-                return params.get('dn') || params.get('xt') || 'Magnet link';
-            } catch (_) { return 'Magnet link'; }
-        },
-        add() {
-            const link = this.draft.trim();
-            let valid = false;
-            try { valid = /^magnet:\?/i.test(link) && !/[\r\n]/.test(link) && !!new URL(link).searchParams.get('xt'); } catch (_) {}
-            if (!valid) {
-                this.error = 'Paste one valid magnet link.'; return;
-            }
-            if (this.links.includes(link)) { this.error = 'That link is already added.'; return; }
-            if (this.links.length >= 50) { this.error = 'You can add up to 50 links.'; return; }
-            if (link.length > 8192 || this.links.join('\n').length + link.length > 110000) {
-                this.error = 'These links are too large for one import.'; return;
-            }
-            this.links.push(link); this.draft = ''; this.error = '';
-            this.$nextTick(() => this.$refs.draft.focus());
-        },
-        imported(accepted) {
-            this.links = this.links.filter(link => !accepted.includes(link));
-        }
-    };
-};
-
+// Native dialog coordinates HTMX metadata loading and cancellation.
 (function () {
     let previewXHR = null;
     function dialog() { return document.getElementById('file-picker'); }

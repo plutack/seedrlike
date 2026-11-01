@@ -94,33 +94,19 @@ templ Download() {
 					>Choose files</button>
 				</div>
 			</form>
-			<details class="mt-3 rounded-box border border-base-300 p-3" x-data="magnetBatch()" x-on:batch-imported.window="imported($event.detail.accepted)">
-				<summary class="cursor-pointer text-sm font-medium">Import multiple magnets</summary>
-				<div class="mt-3 space-y-3">
-					<label class="block text-sm font-medium" for="batch-magnet-draft">Magnet link</label>
-					<div class="flex gap-2">
-						<input id="batch-magnet-draft" x-ref="draft" type="text" x-model="draft" x-on:keydown.enter.prevent="add()" class="input input-bordered w-full min-w-0" placeholder="Paste a magnet link" autocomplete="off" aria-describedby="batch-error"/>
-						<button type="button" class="btn btn-outline shrink-0" x-on:click="add()" x-bind:disabled="!draft.trim() || busy">Add</button>
-					</div>
-					<p id="batch-error" x-cloak x-show="error" x-text="error" class="text-sm text-error" role="alert"></p>
-					<ul class="space-y-2 max-h-64 overflow-y-auto" aria-label="Magnets to import">
-						<template x-for="(link, index) in links" :key="link">
-							<li class="flex min-w-0 items-center gap-3 rounded-box border border-base-300 bg-base-200 p-3">
-								<div class="min-w-0 flex-1"><p class="truncate text-sm font-medium" x-text="label(link)" x-bind:title="label(link)"></p><p class="truncate text-xs text-base-content/70" x-text="link"></p></div>
-								<button type="button" class="btn btn-ghost btn-sm shrink-0" x-on:click="links.splice(index, 1)" x-bind:disabled="busy" x-bind:aria-label="'Remove ' + label(link)">Remove</button>
-							</li>
-						</template>
-					</ul>
-					<form method="post" action="/downloads/batch" hx-post="/downloads/batch" hx-target="#batch-response" hx-swap="innerHTML" hx-disabled-elt="find button" x-on:htmx:before-request.camel="busy = true" x-on:htmx:after-request.camel="busy = false" class="space-y-3">
-						<input type="hidden" name="magnets" x-bind:value="links.join('\n')"/>
-						<div class="flex flex-wrap items-center justify-between gap-3">
-							<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is-zipped" checked class="checkbox checkbox-sm"/>ZIP each download</label>
-							<button class="btn btn-primary btn-sm" type="submit" x-bind:disabled="!links.length || busy" x-text="busy ? 'Importing…' : 'Import (' + links.length + ')'"></button>
-						</div>
-					</form>
-					<div id="batch-response" aria-live="polite"></div>
-				</div>
-			</details>
+			<details class="mt-3 rounded-box border border-base-300 p-3">
+ <summary class="cursor-pointer text-sm font-medium">Upload a .torrent file</summary>
+ <form method="post" action="/downloads/torrent" enctype="multipart/form-data" hx-post="/downloads/torrent" hx-encoding="multipart/form-data" hx-target="#torrent-upload-response" hx-swap="innerHTML" hx-disabled-elt="find button" class="mt-3 space-y-3" x-data="{ filename: '' }" x-on:torrent-uploaded.window="$el.reset(); filename = ''">
+  <label for="torrent-file" class="block text-sm font-medium">Torrent file</label>
+  <input id="torrent-file" type="file" name="torrent-file" accept=".torrent,application/x-bittorrent" required class="file-input file-input-bordered w-full min-w-0" aria-describedby="torrent-file-help" x-on:change="filename = $event.target.files[0]?.name || ''"/>
+  <p id="torrent-file-help" class="text-xs text-base-content/70">Up to 4 MB · Downloads all files</p>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+   <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is-zipped" checked class="checkbox checkbox-sm"/>ZIP download</label>
+   <button class="btn btn-primary btn-sm" type="submit" x-bind:disabled="!filename">Download torrent</button>
+  </div>
+ </form>
+ <div id="torrent-upload-response" class="mt-3" aria-live="polite"></div>
+ </details>
 			@FilePickerDialog()
 			<!--
 				Filter bar + results live in one Alpine scope. Filters run

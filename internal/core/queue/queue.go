@@ -47,8 +47,10 @@ const (
 
 type DownloadRequest struct {
 	MagnetLink string
-	IsZipped   bool
-	UserID     *string
+	// Uploaded metadata is persisted before the job becomes visible to workers.
+	TorrentData []byte
+	IsZipped    bool
+	UserID      *string
 	// nil selects every file; an explicit empty list is invalid.
 	Selected []int
 }
@@ -198,6 +200,14 @@ func cloneSelection(s []int) []int {
 }
 
 func (q *DownloadQueue) Add(r DownloadRequest) error {
+	var metadata *metainfo.MetaInfo
+	if r.TorrentData != nil {
+		var err error
+		metadata, r.MagnetLink, err = ParseTorrentFile(r.TorrentData)
+		if err != nil {
+			return err
+		}
+	}
 	m, err := metainfo.ParseMagnetUri(r.MagnetLink)
 	if err != nil {
 		return errors.New("invalid magnet link")
@@ -231,6 +241,26 @@ func (q *DownloadQueue) Add(r DownloadRequest) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	// Cache the original metainfo before committing the job, preserving private
+	// tracker flags, tracker tiers and piece hashes across queueing/restarts.
+	// Use a UUID directory under an os.Root; never the uploaded filename.
+	if metadata != nil {
+		root, e := os.OpenRoot(q.dataDir)
+		if e != nil {
+			return e
+		}
+		defer root.Close()
+		if e = root.Mkdir(j.ID, 0700); e != nil {
+			return e
+		}
+		jobDir := filepath.Join(q.dataDir, j.ID)
+		if e = persistMetadata(jobDir, metadata); e != nil {
+			_ = root.RemoveAll(j.ID)
+			return fmt.Errorf("persist torrent metadata: %w", e)
+		}
+		// Keep metadata if Create returns an ambiguous database error: the job
+		// may have committed and must still be recoverable after restart.
+	}
 	if err = q.store.Create(ctx, &j); err != nil {
 		return fmt.Errorf("persist job: %w", err)
 	}

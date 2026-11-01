@@ -23,7 +23,7 @@ func TestParseSelection(t *testing.T) {
 }
 func TestDownloadMutationsRequireAuthentication(t *testing.T) {
 	d := NewDownloadHandler(queue.New())
-	for _, handler := range []http.HandlerFunc{d.CreateNewDownload, d.Batch, d.Preview, d.StopDownload} {
+	for _, handler := range []http.HandlerFunc{d.CreateNewDownload, d.UploadTorrent, d.Preview, d.StopDownload} {
 		r := httptest.NewRequest("POST", "/downloads", strings.NewReader("magnet-link=test"))
 		w := httptest.NewRecorder()
 		handler(w, r)

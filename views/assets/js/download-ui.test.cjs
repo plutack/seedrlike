@@ -24,7 +24,14 @@ test('upload blocks duplicate requests and edits; error retains file; acceptance
  u.finish({detail:{failed:true}});assert.ok(u.error);assert.ok(u.file);assert.equal(u.busy,false);u.accepted();assert.equal(u.file,null);assert.equal(u.error,'');
 });
 test('preview immediately opens modal; closing aborts lookup',()=>{
- const f=fixture();f.listeners['htmx:beforeRequest']({detail:{requestConfig:{path:'/downloads/preview'},xhr:f.xhr}});
+ const f=fixture();f.listeners['htmx:beforeRequest']({detail:{target:{id:'file-picker-content'},requestConfig:{path:'/downloads/preview'},xhr:f.xhr}});
  assert.equal(f.modal.open,true);f.listeners.close({target:{id:'file-picker'}});assert.equal(f.aborted,true);
 });
+test('multipart preview opens for array or missing action parameters',()=>{
+ for(const parameters of [{action:['preview']},{},undefined]){
+  const f=fixture();f.listeners['htmx:beforeRequest']({detail:{target:{id:'file-picker-content'},requestConfig:{path:'/downloads/torrent',parameters},xhr:f.xhr}});assert.equal(f.modal.open,true);
+  const u=upload();u.choose([{name:'a.torrent',size:100}]);u.start({detail:{target:{id:'file-picker-content'}},preventDefault(){}});assert.equal(u.previewing,true);
+ }
+});
+test('ordinary upload does not open the picker',()=>{const f=fixture();f.listeners['htmx:beforeRequest']({detail:{target:{id:'torrent-upload-response'},requestConfig:{path:'/downloads/torrent'},xhr:f.xhr}});assert.equal(f.modal.open,false)});
 test('queue success closes modal',()=>{const f=fixture();f.modal.open=true;f.listeners['download-queued']();assert.equal(f.modal.open,false)});

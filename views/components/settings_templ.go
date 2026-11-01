@@ -9,6 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/plutack/seedrlike/internal/notifications"
+import "fmt"
 
 func NotificationSettings(s notifications.Settings, csrf string, message string, isError bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -31,7 +32,7 @@ func NotificationSettings(s notifications.Settings, csrf string, message string,
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"mx-auto max-w-2xl px-4 py-8 sm:py-12\" aria-labelledby=\"settings-title\"><a href=\"/\" class=\"link text-sm text-base-content/70\">← Back to your files</a><div class=\"mt-6 mb-8\"><p class=\"text-xs font-bold tracking-widest uppercase text-primary\">Your account</p><h1 id=\"settings-title\" class=\"text-3xl font-bold mt-2\">Email notifications</h1><p class=\"text-base-content/70 mt-3\">Less checking. More doing. Get a heads-up when your downloads are ready—or need attention.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"mx-auto max-w-2xl px-4 py-8 sm:py-12\" aria-labelledby=\"settings-title\"><a href=\"/\" class=\"link text-sm text-base-content/70\">← Back to your files</a><h1 id=\"settings-title\" class=\"text-3xl font-bold mt-6 mb-8\">Email notifications</h1>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -44,7 +45,7 @@ func NotificationSettings(s notifications.Settings, csrf string, message string,
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 15, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 12, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -62,7 +63,7 @@ func NotificationSettings(s notifications.Settings, csrf string, message string,
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 17, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 14, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -74,96 +75,94 @@ func NotificationSettings(s notifications.Settings, csrf string, message string,
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"card bg-base-100 border border-base-300 shadow-sm\"><div class=\"card-body gap-6\"><form method=\"post\" action=\"/settings\" class=\"space-y-6\"><input type=\"hidden\" name=\"csrf\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"card bg-base-100 border border-base-300 shadow-sm\"><div class=\"card-body\"><form method=\"post\" action=\"/settings\" class=\"space-y-6\" data-email=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(csrf)
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(s.Email)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 23, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 20, Col: 25}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\"><div><h2 class=\"card-title\">Where should we send updates?</h2><label for=\"notification-email\" class=\"label font-medium\">Notification email</label> <input id=\"notification-email\" type=\"email\" name=\"email\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" data-verified=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(s.Email)
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(s.Verified))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 27, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 20, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" maxlength=\"254\" autocomplete=\"email\" class=\"input input-bordered w-full\" aria-describedby=\"email-help email-status\"><p id=\"email-help\" class=\"text-sm text-base-content/70 mt-2\">Separate from your username. Changing this address requires verification again. Clear it to stop all emails.</p><p id=\"email-status\" class=\"text-sm font-medium mt-3\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if s.Verified {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<span class=\"badge badge-success\">Verified</span> <span>Ready to receive notifications.</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else if s.Email != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<span class=\"badge badge-warning\">Not verified</span> <span>Check your inbox after requesting a link.</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<span class=\"badge badge-ghost\">Not connected</span> <span>Add an email to get started.</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</p></div><fieldset class=\"border-t border-base-300 pt-4\"><legend class=\"font-semibold px-1\">Keep me in the loop</legend> <label class=\"flex items-center gap-3 py-3 cursor-pointer\" for=\"notify-completed\"><input id=\"notify-completed\" type=\"checkbox\" name=\"completed\" class=\"toggle toggle-primary\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if s.Completed {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " checked")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "> <span><span class=\"font-medium block\">Download completed</span><span class=\"text-sm text-base-content/70\">Your files are ready to open.</span></span></label> <label class=\"flex items-center gap-3 py-3 cursor-pointer\" for=\"notify-failed\"><input id=\"notify-failed\" type=\"checkbox\" name=\"failed\" class=\"toggle toggle-primary\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if s.Failed {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " checked")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "> <span><span class=\"font-medium block\">Download failed</span><span class=\"text-sm text-base-content/70\">Something needs your attention.</span></span></label></fieldset><div class=\"flex flex-wrap gap-3\"><button type=\"submit\" class=\"btn btn-primary\">Save preferences</button> <button type=\"submit\" name=\"action\" value=\"verify\" class=\"btn btn-outline\">Save & send verification</button></div><p class=\"text-xs text-base-content/70\">Verification links expire in 30 minutes. Verification and test emails are limited to one of each per minute.</p></form><div class=\"border-t border-base-300 pt-5\"><h2 class=\"font-semibold\">Make sure it reaches you</h2><p class=\"text-sm text-base-content/70 mt-1 mb-4\">Send a sample to your verified address. Your preferences won’t change.</p><form method=\"post\" action=\"/settings/test\"><input type=\"hidden\" name=\"csrf\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" x-data=\"{ email: $el.dataset.email, originalEmail: $el.dataset.email, originallyVerified: $el.dataset.verified === &#39;true&#39;, get verified() { return this.originallyVerified &amp;&amp; this.email.trim() === this.originalEmail; } }\"><input type=\"hidden\" name=\"csrf\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(csrf)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 60, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 22, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\"> <button type=\"submit\" class=\"btn btn-outline btn-sm\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"><div><label for=\"notification-email\" class=\"label font-medium\">Notification email</label> <input id=\"notification-email\" type=\"email\" name=\"email\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if !s.Verified {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, " disabled")
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(s.Email)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 25, Col: 78}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" x-model=\"email\" maxlength=\"254\" autocomplete=\"email\" class=\"input input-bordered w-full\" aria-describedby=\"email-status\"><p id=\"email-status\" class=\"text-sm font-medium mt-3\" aria-live=\"polite\"><span class=\"badge badge-success\" x-show=\"verified\" x-cloak>Verified</span> <span class=\"badge badge-warning\" x-show=\"email.trim() &amp;&amp; !verified\" x-cloak>Not verified</span> <span class=\"badge badge-ghost\" x-show=\"!email.trim()\" x-cloak>Not set</span></p></div><fieldset class=\"border-t border-base-300 pt-4\"><legend class=\"font-semibold px-1\">Notify me when</legend> <label class=\"flex items-center gap-3 py-3 cursor-pointer\" for=\"notify-completed\"><input id=\"notify-completed\" type=\"checkbox\" name=\"completed\" class=\"toggle toggle-primary\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if s.Completed {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, ">Send test email</button></form></div></div></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "> <span class=\"font-medium\">Download completed</span></label> <label class=\"flex items-center gap-3 py-3 cursor-pointer\" for=\"notify-failed\"><input id=\"notify-failed\" type=\"checkbox\" name=\"failed\" class=\"toggle toggle-primary\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if s.Failed {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " checked")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "> <span class=\"font-medium\">Download failed</span></label></fieldset><div class=\"flex flex-wrap gap-3\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if s.Verified || s.Email == "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<button type=\"submit\" name=\"action\" value=\"save\" x-bind:value=\"email.trim() &amp;&amp; !verified ? &#39;verify&#39; : &#39;save&#39;\" x-text=\"email.trim() &amp;&amp; !verified ? &#39;Save &amp; verify&#39; : &#39;Save&#39;\" class=\"btn btn-primary\">Save</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<button type=\"submit\" name=\"action\" value=\"verify\" x-bind:value=\"email.trim() &amp;&amp; !verified ? &#39;verify&#39; : &#39;save&#39;\" x-text=\"email.trim() &amp;&amp; !verified ? &#39;Save &amp; verify&#39; : &#39;Save&#39;\" class=\"btn btn-primary\">Save &amp; verify</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<button type=\"submit\" name=\"action\" value=\"unset\" class=\"btn btn-outline\" formnovalidate>Unset</button></div></form></div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -187,38 +186,38 @@ func ConfirmNotificationEmail(token string, csrf string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var7 == nil {
-			templ_7745c5c3_Var7 = templ.NopComponent
+		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var8 == nil {
+			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<section class=\"mx-auto max-w-2xl px-4 py-12\"><div class=\"card bg-base-100 border border-base-300 shadow-sm\"><div class=\"card-body\"><p class=\"text-xs font-bold tracking-widest uppercase text-primary\">One last step</p><h1 class=\"text-3xl font-bold\">Confirm your email</h1><p class=\"text-base-content/70 py-4\">Confirm that this is the address you want to use for Seedrlike notifications. You must be signed in to the account that requested this link.</p><form method=\"post\" action=\"/settings/verify\"><input type=\"hidden\" name=\"token\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(token)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 76, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\"> <input type=\"hidden\" name=\"csrf\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<section class=\"mx-auto max-w-2xl px-4 py-12\"><div class=\"card bg-base-100 border border-base-300 shadow-sm\"><div class=\"card-body\"><h1 class=\"text-3xl font-bold\">Confirm your email</h1><p class=\"text-base-content/70 py-4\">Verify this address for your notification settings.</p><form method=\"post\" action=\"/settings/verify\"><input type=\"hidden\" name=\"token\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(csrf)
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(token)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 77, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 63, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"> <button type=\"submit\" class=\"btn btn-primary\">Verify my email</button> <a href=\"/settings\" class=\"btn btn-ghost\">Not now</a></form></div></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\"> <input type=\"hidden\" name=\"csrf\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(csrf)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/settings.templ`, Line: 64, Col: 49}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\"> <button type=\"submit\" class=\"btn btn-primary\">Verify my email</button> <a href=\"/settings\" class=\"btn btn-ghost\">Not now</a></form></div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

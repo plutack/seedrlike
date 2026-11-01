@@ -11,22 +11,25 @@ func humanBytes(n int64) string {
 }
 
 templ DownloadFeedback(message string, failed bool) {
- <div role="status" class="rounded-box border border-base-300 bg-base-200 p-4 text-sm">
-  if failed {
-   <strong class="text-error">Could not add download. </strong>
-  }
-  { message }
+ <div role="status" class="flex w-full min-w-0 items-start gap-3 rounded-box border border-base-300 bg-base-200 p-3 text-sm" x-data="{ visible: true }" x-show="visible" x-init="if ($el.dataset.failed === 'false') setTimeout(() => visible = false, 6000)" data-failed={ strconv.FormatBool(failed) }>
+  <p class="min-w-0 flex-1 break-words">
+   if failed {
+    <strong class="text-error">Could not add download. </strong>
+   }
+   { message }
+  </p>
+  <button type="button" class="btn btn-ghost btn-xs shrink-0" aria-label="Dismiss notification" x-on:click="visible = false">Dismiss</button>
  </div>
 }
 
 templ BatchFeedback(results []BatchResult) {
- <div role="status" class="rounded-box border border-base-300 p-4 text-sm space-y-2">
-  <h3 class="font-semibold">Batch import results</h3>
+ <div role="status" class="w-full min-w-0 rounded-box border border-base-300 p-3 text-sm space-y-2" x-data="{ visible: true }" x-show="visible">
+  <div class="flex items-center justify-between gap-3"><h3 class="font-semibold">Import results</h3><button type="button" class="btn btn-ghost btn-xs" x-on:click="visible = false" aria-label="Dismiss import results">Dismiss</button></div>
   if len(results)==0 {
-   <p>No links were entered.</p>
+   <p>Add a magnet link first.</p>
   }
   for _, result := range results {
-   <p><span class="font-medium">Line { strconv.Itoa(result.Line) }: </span>
+   <p class="break-words"><span class="font-medium">Item { strconv.Itoa(result.Line) }: </span>
    if result.Failed {
     <span class="text-error">{ result.Message }</span>
    } else {
@@ -37,28 +40,39 @@ templ BatchFeedback(results []BatchResult) {
  </div>
 }
 
+templ FilePickerDialog() {
+ <dialog id="file-picker" class="modal" aria-labelledby="file-picker-title">
+  <div class="modal-box w-full max-w-3xl p-4 sm:p-6">
+   <div class="flex items-center justify-between gap-3 mb-4"><h2 id="file-picker-title" class="text-xl font-semibold">Choose files</h2><form method="dialog"><button type="submit" class="btn btn-ghost btn-sm" aria-label="Close file selection">Close</button></form></div>
+   <div id="file-picker-content" aria-live="polite"></div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button type="submit" aria-label="Close file selection">Close</button></form>
+ </dialog>
+ <template id="file-picker-loading"><div class="flex flex-col items-center justify-center gap-3 py-12" role="status"><span class="loading loading-spinner loading-md text-primary" aria-hidden="true"></span><p class="text-sm">Loading files…</p></div></template>
+}
+
 templ FileSelection(magnet string, name string, zipped bool, files []SelectableFile) {
- <form method="post" action="/downloads" hx-post="/downloads" hx-target="#download-response" hx-swap="innerHTML" class="rounded-box border border-base-300 bg-base-100 p-4 text-left" x-data="{ bytes: 0, count: 0, sync() { const checked = [...this.$root.querySelectorAll('input[name=files]:checked')]; this.count=checked.length; this.bytes=checked.reduce((n,c)=>n+Number(c.dataset.size),0); }, all(value) { this.$root.querySelectorAll('input[name=files]').forEach(c=>c.checked=value); this.sync(); } }" x-init="sync()">
+ <form method="post" action="/downloads" hx-post="/downloads" hx-target="#file-picker-feedback" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" class="min-w-0 text-left" x-data="{ bytes: 0, count: 0, sync() { const checked = [...this.$root.querySelectorAll('input[name=files]:checked')]; this.count=checked.length; this.bytes=checked.reduce((n,c)=>n+Number(c.dataset.size),0); }, all(value) { this.$root.querySelectorAll('input[name=files]').forEach(c=>c.checked=value); this.sync(); } }" x-init="sync()">
   <input type="hidden" name="magnet-link" value={ magnet }/>
   <input type="hidden" name="selection" value="explicit"/>
-  <h3 class="font-semibold break-words">{ name }</h3>
-  <p class="text-sm text-base-content/70 mt-1">Choose the files to download. Only your selection will be uploaded.</p>
+  <h3 class="font-semibold break-all">{ name }</h3>
+  <div id="file-picker-feedback" class="mt-3" aria-live="polite"></div>
   <div class="flex flex-wrap items-center gap-3 py-3 text-sm">
    <button type="button" class="btn btn-ghost btn-xs" x-on:click="all(true)">Select all</button>
-   <button type="button" class="btn btn-ghost btn-xs" x-on:click="all(false)">Clear selection</button>
-   <span aria-live="polite" x-text="count + ' files · ' + (bytes / 1048576).toFixed(1) + ' MB selected'"></span>
+   <button type="button" class="btn btn-ghost btn-xs" x-on:click="all(false)">Clear</button>
+   <span aria-live="polite" x-text="count + ' files · ' + (bytes / 1048576).toFixed(1) + ' MB'"></span>
   </div>
   <div class="max-h-96 overflow-y-auto divide-y divide-base-200">
    for _, file := range files {
     <label class="flex items-center gap-3 py-3 cursor-pointer">
-     <input type="checkbox" name="files" value={ strconv.Itoa(file.Index) } data-size={ strconv.FormatInt(file.Size,10) } checked class="checkbox checkbox-sm checkbox-primary" x-on:change="sync()"/>
-     <span class="min-w-0 flex-1 break-words text-sm">{ file.Name }</span>
+     <input type="checkbox" name="files" value={ strconv.Itoa(file.Index) } data-size={ strconv.FormatInt(file.Size,10) } checked class="checkbox checkbox-sm checkbox-primary shrink-0" x-on:change="sync()"/>
+     <span class="min-w-0 flex-1 break-all text-sm">{ file.Name }</span>
      <span class="text-xs whitespace-nowrap text-base-content/70">{ humanBytes(file.Size) }</span>
     </label>
    }
   </div>
-  <div class="flex items-center justify-between gap-3 pt-4">
-   <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is-zipped" checked?={ zipped } class="checkbox checkbox-sm"/>Bundle as ZIP</label>
+  <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-base-300">
+   <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is-zipped" checked?={ zipped } class="checkbox checkbox-sm"/>ZIP download</label>
    <button type="submit" class="btn btn-primary btn-sm" x-bind:disabled="count === 0">Download selected</button>
   </div>
  </form>

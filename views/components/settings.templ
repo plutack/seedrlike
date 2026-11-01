@@ -1,15 +1,12 @@
 package components
 
 import "github.com/plutack/seedrlike/internal/notifications"
+import "fmt"
 
 templ NotificationSettings(s notifications.Settings, csrf string, message string, isError bool) {
  <section class="mx-auto max-w-2xl px-4 py-8 sm:py-12" aria-labelledby="settings-title">
   <a href="/" class="link text-sm text-base-content/70">← Back to your files</a>
-  <div class="mt-6 mb-8">
-   <p class="text-xs font-bold tracking-widest uppercase text-primary">Your account</p>
-   <h1 id="settings-title" class="text-3xl font-bold mt-2">Email notifications</h1>
-   <p class="text-base-content/70 mt-3">Less checking. More doing. Get a heads-up when your downloads are ready—or need attention.</p>
-  </div>
+  <h1 id="settings-title" class="text-3xl font-bold mt-6 mb-8">Email notifications</h1>
   if message != "" {
    if isError {
     <div role="alert" class="alert alert-error mb-6">{ message }</div>
@@ -18,49 +15,40 @@ templ NotificationSettings(s notifications.Settings, csrf string, message string
    }
   }
   <div class="card bg-base-100 border border-base-300 shadow-sm">
-   <div class="card-body gap-6">
-    <form method="post" action="/settings" class="space-y-6">
+   <div class="card-body">
+    <form method="post" action="/settings" class="space-y-6"
+     data-email={ s.Email } data-verified={ fmt.Sprint(s.Verified) }
+     x-data="{ email: $el.dataset.email, originalEmail: $el.dataset.email, originallyVerified: $el.dataset.verified === 'true', get verified() { return this.originallyVerified && this.email.trim() === this.originalEmail; } }">
      <input type="hidden" name="csrf" value={ csrf }/>
      <div>
-      <h2 class="card-title">Where should we send updates?</h2>
       <label for="notification-email" class="label font-medium">Notification email</label>
-      <input id="notification-email" type="email" name="email" value={ s.Email } maxlength="254" autocomplete="email" class="input input-bordered w-full" aria-describedby="email-help email-status"/>
-      <p id="email-help" class="text-sm text-base-content/70 mt-2">Separate from your username. Changing this address requires verification again. Clear it to stop all emails.</p>
-      <p id="email-status" class="text-sm font-medium mt-3">
-       if s.Verified {
-        <span class="badge badge-success">Verified</span> <span>Ready to receive notifications.</span>
-       } else if s.Email != "" {
-        <span class="badge badge-warning">Not verified</span> <span>Check your inbox after requesting a link.</span>
-       } else {
-        <span class="badge badge-ghost">Not connected</span> <span>Add an email to get started.</span>
-       }
+      <input id="notification-email" type="email" name="email" value={ s.Email } x-model="email" maxlength="254" autocomplete="email" class="input input-bordered w-full" aria-describedby="email-status"/>
+      <p id="email-status" class="text-sm font-medium mt-3" aria-live="polite">
+       <span class="badge badge-success" x-show="verified" x-cloak>Verified</span>
+       <span class="badge badge-warning" x-show="email.trim() && !verified" x-cloak>Not verified</span>
+       <span class="badge badge-ghost" x-show="!email.trim()" x-cloak>Not set</span>
       </p>
      </div>
      <fieldset class="border-t border-base-300 pt-4">
-      <legend class="font-semibold px-1">Keep me in the loop</legend>
+      <legend class="font-semibold px-1">Notify me when</legend>
       <label class="flex items-center gap-3 py-3 cursor-pointer" for="notify-completed">
        <input id="notify-completed" type="checkbox" name="completed" class="toggle toggle-primary" checked?={ s.Completed }/>
-       <span><span class="font-medium block">Download completed</span><span class="text-sm text-base-content/70">Your files are ready to open.</span></span>
+       <span class="font-medium">Download completed</span>
       </label>
       <label class="flex items-center gap-3 py-3 cursor-pointer" for="notify-failed">
        <input id="notify-failed" type="checkbox" name="failed" class="toggle toggle-primary" checked?={ s.Failed }/>
-       <span><span class="font-medium block">Download failed</span><span class="text-sm text-base-content/70">Something needs your attention.</span></span>
+       <span class="font-medium">Download failed</span>
       </label>
      </fieldset>
      <div class="flex flex-wrap gap-3">
-      <button type="submit" class="btn btn-primary">Save preferences</button>
-      <button type="submit" name="action" value="verify" class="btn btn-outline">Save & send verification</button>
+      if s.Verified || s.Email == "" {
+       <button type="submit" name="action" value="save" x-bind:value="email.trim() && !verified ? 'verify' : 'save'" x-text="email.trim() && !verified ? 'Save & verify' : 'Save'" class="btn btn-primary">Save</button>
+      } else {
+       <button type="submit" name="action" value="verify" x-bind:value="email.trim() && !verified ? 'verify' : 'save'" x-text="email.trim() && !verified ? 'Save & verify' : 'Save'" class="btn btn-primary">Save &amp; verify</button>
+      }
+      <button type="submit" name="action" value="unset" class="btn btn-outline" formnovalidate>Unset</button>
      </div>
-     <p class="text-xs text-base-content/70">Verification links expire in 30 minutes. Verification and test emails are limited to one of each per minute.</p>
     </form>
-    <div class="border-t border-base-300 pt-5">
-     <h2 class="font-semibold">Make sure it reaches you</h2>
-     <p class="text-sm text-base-content/70 mt-1 mb-4">Send a sample to your verified address. Your preferences won’t change.</p>
-     <form method="post" action="/settings/test">
-      <input type="hidden" name="csrf" value={ csrf }/>
-      <button type="submit" class="btn btn-outline btn-sm" disabled?={ !s.Verified }>Send test email</button>
-     </form>
-    </div>
    </div>
   </div>
  </section>
@@ -69,9 +57,8 @@ templ NotificationSettings(s notifications.Settings, csrf string, message string
 templ ConfirmNotificationEmail(token string, csrf string) {
  <section class="mx-auto max-w-2xl px-4 py-12">
   <div class="card bg-base-100 border border-base-300 shadow-sm"><div class="card-body">
-   <p class="text-xs font-bold tracking-widest uppercase text-primary">One last step</p>
    <h1 class="text-3xl font-bold">Confirm your email</h1>
-   <p class="text-base-content/70 py-4">Confirm that this is the address you want to use for Seedrlike notifications. You must be signed in to the account that requested this link.</p>
+   <p class="text-base-content/70 py-4">Verify this address for your notification settings.</p>
    <form method="post" action="/settings/verify">
     <input type="hidden" name="token" value={ token }/>
     <input type="hidden" name="csrf" value={ csrf }/>

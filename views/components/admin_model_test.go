@@ -34,8 +34,22 @@ func TestAdminDashboardStatesAndEscaping(t *testing.T) {
 		want   []string
 		absent []string
 	}{
-		{name: "unavailable", want: []string{"Disk capacity unavailable", "Queue capacity unavailable", "Current jobs unavailable", "Outcome counters unavailable"}, absent: []string{"0 jobs in the queue"}},
-		{name: "empty", data: AdminDashboardData{DiskAvailable: true, QueueAvailable: true, MetricsAvailable: true}, want: []string{"No current jobs", "0 jobs in the queue", "0 B"}},
+		{name: "unavailable", want: []string{"Disk capacity unavailable", "Queue capacity unavailable", "Throughput unavailable", "Current jobs unavailable", "Outcome counters unavailable"}, absent: []string{"No current jobs", "No recorded outcomes", "0 B"}},
+		{name: "empty", data: AdminDashboardData{DiskAvailable: true, QueueAvailable: true, MetricsAvailable: true}, want: []string{"No current jobs", "No recorded outcomes", "0 B", "Not available"}, absent: []string{"capacity unavailable", "counters unavailable"}},
+		{
+			name: "available metrics",
+			data: AdminDashboardData{
+				UpdatedAt: "2026-11-01 12:00 UTC", DiskAvailable: true,
+				DiskFree: 1073741824, DiskTotal: 8589934592,
+				QueueAvailable: true, BudgetBytes: 4294967296, ReservedBytes: 2147483648, Throughput: 3072,
+				Stages:           []AdminStage{{Name: "downloading", Count: 2}, {Name: "pending", Count: 3}},
+				Tasks:            []AdminTask{{ID: "job-unique-42", UserID: "owner-unique-17", Name: "Example torrent", Status: "downloading", Completed: 512, Size: 4096, Reserved: 8192, Speed: 2048}},
+				MetricsAvailable: true,
+				Outcomes:         []AdminOutcome{{Status: "completed", Jobs: 23, Bytes: 16384}, {Status: "failed", Jobs: 7, Bytes: 32768}, {Status: "cancelled", Jobs: 0, Bytes: 0}},
+			},
+			want:   []string{"2026-11-01 12:00 UTC", "1.0 GiB", "8.0 GiB", "4.0 GiB", "2.0 GiB", "3.0 KiB/s", "Queue stages", "downloading", "pending", ">2</dd>", ">3</dd>", "Example torrent", "512 B", "4.0 KiB", "8.0 KiB", "2.0 KiB/s", "job-unique-42", "owner-unique-17", "Job / owner IDs", "<details", "completed", "failed", "cancelled", ">23</dd>", ">7</dd>", ">0</dd>", "16.0 KiB", "32.0 KiB", "Last 30 days", "Recorded job sizes, not network traffic", "not disk usage", "overflow-x-auto", "tabindex=\"0\"", "scope=\"col\"", "scope=\"row\""},
+			absent: []string{"capacity unavailable", "No current jobs", "No recorded outcomes"},
+		},
 		{name: "escaped job", data: AdminDashboardData{QueueAvailable: true, Tasks: []AdminTask{{Name: "<script>alert(1)</script>", ID: "j1", Status: "pending"}}}, want: []string{"&lt;script&gt;alert(1)&lt;/script&gt;", "Awaiting metadata", "Guest"}, absent: []string{"<script>alert(1)</script>"}},
 	}
 	for _, tt := range tests {
@@ -53,6 +67,11 @@ func TestAdminDashboardStatesAndEscaping(t *testing.T) {
 			for _, absent := range tt.absent {
 				if strings.Contains(html, absent) {
 					t.Errorf("unexpected %q", absent)
+				}
+			}
+			for _, removed := range []string{"Administrator access only", "Zero means no recorded outcomes", "queue snapshot", "Refresh snapshot"} {
+				if strings.Contains(html, removed) {
+					t.Errorf("redundant dashboard copy retained: %q", removed)
 				}
 			}
 			if strings.Contains(html, "hx-trigger") {

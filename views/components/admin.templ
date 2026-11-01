@@ -1,74 +1,98 @@
 package components
 
 templ AdminDashboard(data AdminDashboardData) {
- <section class="mx-auto max-w-7xl px-4 py-8 sm:py-12 space-y-8" aria-labelledby="admin-title">
+ <section class="mx-auto max-w-7xl min-w-0 px-4 py-6 sm:py-8 space-y-6" aria-labelledby="admin-title">
   <a href="/" class="link text-sm">Back to your files</a>
-  <header class="flex flex-wrap items-start justify-between gap-4">
-   <div>
-    <h1 id="admin-title" class="text-3xl font-bold">Capacity dashboard</h1>
-    <p class="mt-2 text-base-content/70">Live capacity and current work. Administrator access only.</p>
-    <p class="mt-2 text-sm text-base-content/70">Snapshot: { data.UpdatedAt }</p>
+  <header class="flex flex-wrap items-center justify-between gap-3">
+   <div class="min-w-0">
+    <h1 id="admin-title" class="text-2xl sm:text-3xl font-bold">Capacity dashboard</h1>
+    <p class="mt-1 text-sm text-base-content/70 break-words">Updated { data.UpdatedAt }</p>
    </div>
-   <a href="/admin" class="btn btn-outline btn-sm">Refresh snapshot</a>
+   <a href="/admin" class="btn btn-outline btn-sm">Refresh</a>
   </header>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-   <section class="card bg-base-100 border border-base-300" aria-labelledby="disk-title">
-    <div class="card-body">
-     <h2 id="disk-title" class="card-title">Data disk</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+   <section class="card bg-base-100 border border-base-300 min-w-0" aria-labelledby="disk-title">
+    <div class="card-body p-5 gap-2">
+     <h2 id="disk-title" class="text-sm font-medium">Disk available</h2>
      if data.DiskAvailable {
-      <dl class="space-y-3 mt-2">
-       <div class="flex flex-wrap justify-between gap-2"><dt>Available space</dt><dd class="font-mono font-semibold">{ AdminDiskBytes(data.DiskFree) }</dd></div>
-       <div class="flex flex-wrap justify-between gap-2"><dt>Total filesystem capacity</dt><dd class="font-mono">{ AdminDiskBytes(data.DiskTotal) }</dd></div>
-      </dl>
-      <p class="text-sm text-base-content/70 mt-3">Measured on the configured data directory's filesystem. Available space excludes filesystem-reserved blocks.</p>
-      <p class="text-sm text-base-content/70 mt-2">Failed-job files are retained on this disk for manual reconciliation, even after leaving the queue. Inspect the jobs directory and remove reconciled artifacts if capacity runs low.</p>
+      <p class="font-mono text-3xl font-semibold break-words">{ AdminDiskBytes(data.DiskFree) }</p>
+      <p class="text-sm text-base-content/70">of { AdminDiskBytes(data.DiskTotal) } total</p>
      } else {
-      <p role="status" class="mt-2">Disk capacity unavailable. The data directory could not be measured.</p>
+      <p role="status">Disk capacity unavailable.</p>
      }
     </div>
    </section>
-   <section class="card bg-base-100 border border-base-300" aria-labelledby="budget-title">
-    <div class="card-body">
-     <h2 id="budget-title" class="card-title">Download budget</h2>
+   <section class="card bg-base-100 border border-base-300 min-w-0" aria-labelledby="budget-title">
+    <div class="card-body p-5 gap-2">
+     <h2 id="budget-title" class="text-sm font-medium" title="Scheduling commitments, not disk usage">Reserved for downloads</h2>
      if data.QueueAvailable {
-      <dl class="space-y-3 mt-2">
-       <div class="flex flex-wrap justify-between gap-2"><dt>Configured active budget</dt><dd class="font-mono font-semibold">{ AdminBytes(data.BudgetBytes) }</dd></div>
-       <div class="flex flex-wrap justify-between gap-2"><dt>Currently reserved</dt><dd class="font-mono">{ AdminBytes(data.ReservedBytes) }</dd></div>
-       <div class="flex flex-wrap justify-between gap-2"><dt>Download throughput</dt><dd class="font-mono">{ AdminSpeed(data.Throughput) }</dd></div>
-      </dl>
-      <p class="text-sm text-base-content/70 mt-3">Reservations are scheduling commitments, not disk usage. Throughput sums available download samples; upload speed is not measured.</p>
+      <p class="font-mono text-3xl font-semibold break-words">{ AdminBytes(data.ReservedBytes) }</p>
+      <p class="text-sm text-base-content/70">of { AdminBytes(data.BudgetBytes) } active budget</p>
      } else {
-      <p role="status" class="mt-2">Queue capacity unavailable. The download queue is not connected.</p>
+      <p role="status">Queue capacity unavailable.</p>
+     }
+    </div>
+   </section>
+   <section class="card bg-base-100 border border-base-300 min-w-0" aria-labelledby="throughput-title">
+    <div class="card-body p-5 gap-2">
+     <h2 id="throughput-title" class="text-sm font-medium">Download throughput</h2>
+     if data.QueueAvailable {
+      <p class="font-mono text-3xl font-semibold break-words">{ AdminSpeed(data.Throughput) }</p>
+      <p class="text-sm text-base-content/70">Combined download samples</p>
+     } else {
+      <p role="status">Throughput unavailable.</p>
      }
     </div>
    </section>
   </div>
-  <section class="card bg-base-100 border border-base-300" aria-labelledby="current-title">
-   <div class="card-body">
-    <h2 id="current-title" class="card-title">Current jobs</h2>
+  <details class="text-sm">
+   <summary class="cursor-pointer font-medium">Capacity notes</summary>
+   <ul class="mt-2 space-y-1 text-base-content/70 list-disc pl-5">
+    <li>Reserved bytes are scheduling commitments, not disk usage.</li>
+    <li>Disk available excludes filesystem-reserved blocks on the data directory's filesystem.</li>
+    <li>Failed-job files remain on disk for manual reconciliation. Remove reconciled artifacts if capacity runs low.</li>
+    <li>Throughput uses available download samples; upload speed is not measured.</li>
+   </ul>
+  </details>
+  <section class="card bg-base-100 border border-base-300 min-w-0" aria-labelledby="current-title">
+   <div class="card-body p-4 sm:p-5 gap-4 min-w-0">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+     <h2 id="current-title" class="card-title">Current queue</h2>
+     if data.QueueAvailable {
+      <p class="text-sm"><span class="font-mono font-semibold">{ AdminQueueCount(len(data.Tasks)) }</span> jobs</p>
+     }
+    </div>
     if !data.QueueAvailable {
      <p role="status">Current jobs unavailable.</p>
     } else {
-     <p>{ AdminQueueCount(len(data.Tasks)) } jobs in the queue snapshot.</p>
      if len(data.Stages) > 0 {
-      <dl class="flex flex-wrap gap-3 my-3" aria-label="Queue stages">
+      <dl class="flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="Queue stages">
        for _, stage := range data.Stages {
-        <div class="badge badge-outline gap-2"><dt>{ stage.Name }</dt><dd>{ AdminQueueCount(stage.Count) }</dd></div>
+        <div class="flex items-baseline gap-2"><dt class="text-base-content/70">{ stage.Name }</dt><dd class="font-mono font-semibold">{ AdminQueueCount(stage.Count) }</dd></div>
        }
       </dl>
      }
      if len(data.Tasks) == 0 {
-      <div class="py-8 text-center"><p class="font-semibold">No current jobs</p><p class="text-sm text-base-content/70 mt-2">New downloads will appear here when they enter the queue.</p></div>
+      <p class="py-4 text-sm text-base-content/70">No current jobs</p>
      } else {
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto" role="region" aria-label="Current jobs" tabindex="0">
        <table class="table table-sm">
-        <caption class="text-left text-sm text-base-content/70 pb-3">Current work only. Completed jobs are represented in the outcome counters below.</caption>
-        <thead><tr><th scope="col">Job / owner</th><th scope="col">Stage</th><th scope="col">Downloaded / size</th><th scope="col">Reserved</th><th scope="col">Download speed</th></tr></thead>
+        <caption class="sr-only">Current jobs with stage, downloaded size, reserved bytes and download speed</caption>
+        <thead><tr><th scope="col">Job</th><th scope="col">Stage</th><th scope="col">Downloaded / size</th><th scope="col" title="Scheduling commitment, not disk usage">Reserved</th><th scope="col">Download speed</th></tr></thead>
         <tbody>
          for _, task := range data.Tasks {
           <tr>
-           <td><div class="font-medium break-all">{ AdminTaskName(task) }</div><div class="text-xs break-all mt-1">Job: { task.ID }</div><div class="text-xs break-all mt-1">Owner: { AdminOwner(task.UserID) }</div></td>
-           <td>{ task.Status }</td>
+           <th scope="row" class="font-normal">
+            <div class="font-medium break-all">{ AdminTaskName(task) }</div>
+            <details class="mt-1 text-xs">
+             <summary class="cursor-pointer">Job / owner IDs</summary>
+             <dl class="mt-2 space-y-1">
+              <div><dt class="font-medium">Job ID</dt><dd class="font-mono break-all">{ task.ID }</dd></div>
+              <div><dt class="font-medium">Owner ID</dt><dd class="font-mono break-all">{ AdminOwner(task.UserID) }</dd></div>
+             </dl>
+            </details>
+           </th>
+           <td class="whitespace-nowrap">{ task.Status }</td>
            <td class="font-mono whitespace-nowrap">
             { AdminBytes(task.Completed) } /
             if task.Size > 0 {
@@ -88,24 +112,28 @@ templ AdminDashboard(data AdminDashboardData) {
     }
    </div>
   </section>
-  <section class="card bg-base-100 border border-base-300" aria-labelledby="outcomes-title">
-   <div class="card-body">
-    <h2 id="outcomes-title" class="card-title">Outcomes in the last 30 days</h2>
-    <p class="text-sm text-base-content/70">Persisted aggregate counters, not individual job history. Bytes reflect recorded job sizes, not measured network traffic.</p>
+  <section class="card bg-base-100 border border-base-300 min-w-0" aria-labelledby="outcomes-title">
+   <div class="card-body p-4 sm:p-5 gap-4">
+    <h2 id="outcomes-title" class="card-title flex-wrap">Outcomes <span class="text-sm font-normal text-base-content/70">Last 30 days</span></h2>
     if !data.MetricsAvailable {
-     <p role="status" class="mt-3">Outcome counters unavailable. The metrics store could not be read.</p>
+     <p role="status">Outcome counters unavailable.</p>
     } else {
-     <div class="overflow-x-auto mt-3">
-      <table class="table table-sm">
-       <thead><tr><th scope="col">Outcome</th><th scope="col">Jobs</th><th scope="col">Recorded size</th></tr></thead>
-       <tbody>
-        for _, outcome := range data.Outcomes {
-         <tr><th scope="row" class="font-medium">{ outcome.Status }</th><td class="font-mono">{ AdminCount(outcome.Jobs) }</td><td class="font-mono">{ AdminBytes(outcome.Bytes) }</td></tr>
-        }
-       </tbody>
-      </table>
-     </div>
-     <p class="text-sm text-base-content/70 mt-2">Zero means no recorded outcomes in this window. Counters begin when persistent job tracking is enabled.</p>
+     if len(data.Outcomes) == 0 {
+      <p class="text-sm text-base-content/70">No recorded outcomes</p>
+     } else {
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+       for _, outcome := range data.Outcomes {
+        <section class="min-w-0 border-l-2 border-base-300 pl-4" aria-label={ outcome.Status }>
+         <h3 class="text-sm font-medium">{ outcome.Status }</h3>
+         <dl class="mt-2 space-y-1">
+          <div class="flex flex-wrap items-baseline gap-2"><dt class="text-sm text-base-content/70">jobs</dt><dd class="order-first font-mono text-2xl font-semibold">{ AdminCount(outcome.Jobs) }</dd></div>
+          <div class="text-sm"><dt class="text-base-content/70">Recorded size</dt><dd class="font-mono break-words">{ AdminBytes(outcome.Bytes) }</dd></div>
+         </dl>
+        </section>
+       }
+      </div>
+     }
+     <p class="text-xs text-base-content/70">Recorded job sizes, not network traffic. Aggregate counters, not job history.</p>
     }
    </div>
   </section>

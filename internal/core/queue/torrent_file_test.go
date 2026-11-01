@@ -29,6 +29,24 @@ func torrentFixture(t *testing.T, mutate func(*metainfo.Info)) []byte {
 	}
 	return buf.Bytes()
 }
+func TestUploadedNestedSelectionIsPersisted(t *testing.T) {
+	s := &fakeStore{}
+	q := configured(t, s)
+	data := torrentFixture(t, func(i *metainfo.Info) {
+		i.Name = "bundle"
+		i.Length = 0
+		i.Files = []metainfo.FileInfo{{Length: 3, Path: []string{"deep", "wanted"}}, {Length: 5, Path: []string{"deep", "skip"}}}
+	})
+	selection := []int{0}
+	if err := q.Add(DownloadRequest{TorrentData: data, Selected: selection}); err != nil {
+		t.Fatal(err)
+	}
+	selection[0] = 1
+	if len(s.created[0].Selected) != 1 || s.created[0].Selected[0] != 0 {
+		t.Fatal("nested selection not persisted independently")
+	}
+}
+
 func TestTorrentUploadPersistsOriginalMetadataAndRecovers(t *testing.T) {
 	s := &fakeStore{}
 	q := configured(t, s)

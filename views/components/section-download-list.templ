@@ -28,7 +28,7 @@ templ DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConte
 	<div
 		id="content-list"
 		x-data="{ mutationError: '' }"
-		x-on:htmx:after-request.camel="if ($event.detail.requestConfig.verb.toLowerCase() === 'delete' && !$event.detail.successful) mutationError = 'Deletion could not be completed. Library records were preserved for unconfirmed deletions; some remote items may already have been removed. Please refresh and check before retrying.'"
+		x-on:htmx:after-request.camel="if ($event.detail.requestConfig.verb.toLowerCase() === 'delete' && !$event.detail.successful) mutationError = 'Could not remove library records. Please try again.'"
 		hx-get={ options.FolderURL(folderID) }
 		hx-trigger="refresh from:body"
 		hx-target="this"

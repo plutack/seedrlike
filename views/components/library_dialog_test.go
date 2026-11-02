@@ -37,7 +37,7 @@ func TestBulkDeleteUsesInAppDialog(t *testing.T) {
 			t.Fatalf("native dialog remains: %s", native)
 		}
 	}
-	for _, want := range []string{"<dialog", `aria-labelledby="delete-selected-title"`, "showModal()", "could not be deleted", "response.ok", "x-on:htmx:after-request.camel", "x-text=\"mutationError\"", "Library records were preserved"} {
+	for _, want := range []string{"<dialog", `aria-labelledby="delete-selected-title"`, "showModal()", "could not be deleted", "response.ok", "x-on:htmx:after-request.camel", "x-text=\"mutationError\"", "Could not remove library records"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing deletion dialog behavior %s", want)
 		}

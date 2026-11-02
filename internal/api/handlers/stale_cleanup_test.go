@@ -108,50 +108,28 @@ func TestDeleteRemoteContentConfirmed(t *testing.T) {
 	})
 }
 
-func TestDeleteStaleContentRemoteFailurePreservesDatabase(t *testing.T) {
+func TestDeleteStaleContentRemoteFailureStillAttemptsBothBatchesAndLocalCleanup(t *testing.T) {
 	t.Setenv("ADMIN_USERNAME", "cleanup-admin")
-	files := []string{"file-a", "file-b"}
-	folders := []string{"folder-a", "folder-b"}
-	for _, phase := range []struct {
-		name string
-		ids  []string
-	}{
-		{"files", files},
-		{"folders after successful files", folders},
-	} {
-		for _, failure := range staleDeleteFailures(phase.ids[0], phase.ids[1]) {
-			for _, nilTransactionDB := range []bool{false, true} {
-				name := fmt.Sprintf("%s/%s/nil_transaction_db=%t", phase.name, failure.name, nilTransactionDB)
-				t.Run(name, func(t *testing.T) {
-					state, db := newStaleCleanupDB(t, files, folders)
-					remote := &staleContentDeleter{}
-					wantCalls := [][]string{files}
-					if phase.name != "files" {
-						remote.results = append(remote.results, staleDeleteResult{response: staleDeleteResponse("ok", map[string]string{
-							files[0]: "ok", files[1]: "ok",
-						})})
-						wantCalls = append(wantCalls, folders)
-					}
-					remote.results = append(remote.results, failure.result)
-					transactionDB := db
-					if nilTransactionDB {
-						transactionDB = nil
-					}
-					w := httptest.NewRecorder()
-					DeleteStaleContentFromDB(database.New(db), remote, transactionDB)(w, staleCleanupRequest())
-					if w.Code != http.StatusBadGateway {
-						t.Fatalf("status = %d, want 502; body = %s", w.Code, w.Body.String())
-					}
-					if !reflect.DeepEqual(remote.calls, wantCalls) {
-						t.Errorf("remote calls = %v, want %v", remote.calls, wantCalls)
-					}
-					assertStaleCleanupReads(t, state)
-					if state.begins != 0 || len(state.execs) != 0 {
-						t.Fatalf("remote failure touched local references: Begin=%d, SQL writes=%v", state.begins, state.execs)
-					}
-				})
+	files, folders := []string{"file-a", "file-b"}, []string{"folder-a", "folder-b"}
+	for _, failure := range staleDeleteFailures(files[0], files[1]) {
+		t.Run(failure.name, func(t *testing.T) {
+			state, db := newStaleCleanupDB(t, files, folders)
+			remote := &staleContentDeleter{results: []staleDeleteResult{failure.result, failure.result}}
+			w := httptest.NewRecorder()
+			DeleteStaleContentFromDB(database.New(db), remote, db)(w, staleCleanupRequest())
+			// The test driver refuses Begin. Reaching it proves remote errors no
+			// longer block the existing transactional local cleanup path.
+			if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "Failed to start transaction") {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 			}
-		}
+			if !reflect.DeepEqual(remote.calls, [][]string{files, folders}) {
+				t.Fatalf("remote requests skipped: %v", remote.calls)
+			}
+			assertStaleCleanupReads(t, state)
+			if state.begins != 1 {
+				t.Fatalf("local cleanup not attempted: %d", state.begins)
+			}
+		})
 	}
 }
 

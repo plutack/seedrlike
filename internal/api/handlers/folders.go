@@ -178,10 +178,8 @@ func DeleteContentFromDB(queries *database.Queries, gofileClient *api.Api, db *s
 		err = deleteRemoteContentConfirmed(gofileClient, []string{contentID})
 		if err != nil {
 			slog.Error("Content deletion failed", "operation", "delete_content", "reason", "remote_delete_failed", "error_type", fmt.Sprintf("%T", err))
-			http.Error(w, "Failed to delete from Gofile", http.StatusInternalServerError)
-			return
 		}
-		slog.Info("Remote content deleted", "operation", "delete_content")
+		slog.Info("Remote content deletion attempted", "operation", "delete_content")
 
 		// Start a transaction
 		tx, err := db.BeginTx(r.Context(), nil)
@@ -329,18 +327,13 @@ func DeleteStaleContentFromDB(queries *database.Queries, gofileClient contentDel
 			}
 			staleFolders = safeFolders
 		}
-		// Fail closed before opening the DB transaction. A batch or transport
-		// failure can have partial remote effects: retain ALL references rather
-		// than guessing which files (including folder descendants) were removed.
+		// Remote deletion is best effort: attempt every batch, but always continue
+		// local cleanup after authorization, including stale/already-removed items.
 		if err = deleteRemoteContentConfirmed(gofileClient, staleFiles); err != nil {
-			slog.Error("Stale content deletion failed", "operation", "delete_stale_files", "reason", "remote_delete_unconfirmed", "error_type", fmt.Sprintf("%T", err))
-			http.Error(w, "Gofile deletion could not be confirmed. Library records were preserved; some remote items may already have been removed.", http.StatusBadGateway)
-			return
+			slog.Warn("Remote stale file deletion unconfirmed; continuing local cleanup", "operation", "delete_stale_files", "error_type", fmt.Sprintf("%T", err))
 		}
 		if err = deleteRemoteContentConfirmed(gofileClient, staleFolders); err != nil {
-			slog.Error("Stale content deletion failed", "operation", "delete_stale_folders", "reason", "remote_delete_unconfirmed", "error_type", fmt.Sprintf("%T", err))
-			http.Error(w, "Gofile deletion could not be confirmed. Library records were preserved; some remote items may already have been removed.", http.StatusBadGateway)
-			return
+			slog.Warn("Remote stale folder deletion unconfirmed; continuing local cleanup", "operation", "delete_stale_folders", "error_type", fmt.Sprintf("%T", err))
 		}
 
 		// Start a transaction

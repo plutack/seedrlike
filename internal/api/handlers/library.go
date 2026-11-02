@@ -23,8 +23,12 @@ func renderLibraryAfterDelete(w http.ResponseWriter, r *http.Request, queries *d
 	if folderID != upload.RootFolderPlaceholder {
 		folder, err := queries.GetFolderByID(r.Context(), folderID)
 		if err == sql.ErrNoRows || (err == nil && folder.UserID.Valid && folder.UserID.String != userID) {
-			http.Error(w, "Folder not found", http.StatusNotFound)
-			return
+			// Cleanup may have deleted the folder being viewed. The mutation has
+			// already committed: render the accessible root instead of reporting
+			// a successful deletion as a failed request.
+			folderID = upload.RootFolderPlaceholder
+			err = nil
+			w.Header().Set("HX-Replace-Url", "/?"+options.Values().Encode())
 		}
 		if err != nil {
 			http.Error(w, "Failed to resolve folder", http.StatusInternalServerError)

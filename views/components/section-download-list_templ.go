@@ -78,7 +78,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"content-list\" x-data=\"{ mutationError: &#39;&#39; }\" x-on:htmx:after-request.camel=\"if ($event.detail.requestConfig.verb.toLowerCase() === &#39;delete&#39; &amp;&amp; !$event.detail.successful) mutationError = &#39;Deletion could not be completed. Library records were preserved for unconfirmed deletions; some remote items may already have been removed. Please refresh and check before retrying.&#39;\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"content-list\" x-data=\"{ mutationError: &#39;&#39; }\" x-on:htmx:after-request.camel=\"if ($event.detail.requestConfig.verb.toLowerCase() === &#39;delete&#39; &amp;&amp; !$event.detail.successful) mutationError = &#39;Could not remove library records. Please try again.&#39;\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -1,3 +1,19 @@
+// Recheck after debounce too: an older search timer may fire after the input
+// has become a magnet. Never let it overwrite download feedback.
+document.addEventListener('htmx:configRequest', event => {
+    if (event.detail.path !== '/search') return;
+    const input = document.querySelector('input[name="magnet-link"]');
+    const value = input?.value.trim() || '';
+    if (/^magnet:\?/i.test(value) || value.length < 3) event.preventDefault();
+});
+
+document.addEventListener('htmx:beforeSwap', event => {
+    const responseURL = event.detail.xhr?.responseURL;
+    if (!responseURL || new URL(responseURL).pathname !== '/search') return;
+    const value = document.querySelector('input[name="magnet-link"]')?.value.trim() || '';
+    if (/^magnet:\?/i.test(value) || value.length < 3) event.detail.shouldSwap = false;
+});
+
 // File selection is local until explicit submission; HTMX owns the upload.
 window.torrentUpload = function () {
     return {

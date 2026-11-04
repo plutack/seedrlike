@@ -21,14 +21,29 @@ func TestParseSelection(t *testing.T) {
 		}
 	}
 }
-func TestDownloadMutationsRequireAuthentication(t *testing.T) {
+func TestDownloadCancellationRequiresAuthentication(t *testing.T) {
 	d := NewDownloadHandler(queue.New())
-	for _, handler := range []http.HandlerFunc{d.CreateNewDownload, d.UploadTorrent, d.Preview, d.StopDownload} {
+	for _, handler := range []http.HandlerFunc{d.StopDownload} {
 		r := httptest.NewRequest("POST", "/downloads", strings.NewReader("magnet-link=test"))
 		w := httptest.NewRecorder()
 		handler(w, r)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("got %d", w.Code)
+		}
+	}
+}
+func TestAnonymousDownloadsAndPreviewsReachValidation(t *testing.T) {
+	d := NewDownloadHandler(queue.New())
+	for _, handler := range []http.HandlerFunc{d.CreateNewDownload, d.UploadTorrent, d.Preview} {
+		r := httptest.NewRequest("POST", "/downloads", strings.NewReader("magnet-link=invalid"))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		handler(w, r)
+		if w.Code == http.StatusUnauthorized || strings.Contains(w.Body.String(), "Sign in") {
+			t.Fatalf("anonymous request gated: %d %s", w.Code, w.Body.String())
+		}
+		if w.Body.Len() == 0 {
+			t.Fatal("expected validation feedback")
 		}
 	}
 }

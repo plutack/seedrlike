@@ -15,7 +15,7 @@ func TestDownloadAllIsDefaultUIAction(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := out.String()
-	if !strings.Contains(html, `action="/downloads" hx-post="/downloads"`) || !strings.Contains(html, `>Download all</button>`) {
+	if !strings.Contains(html, `action="/downloads" hx-post="/downloads"`) || !strings.Contains(html, `>Download magnet</button>`) {
 		t.Fatal("magnet form must submit whole torrent by default")
 	}
 	if !strings.Contains(html, `hx-post="/downloads/preview"`) {

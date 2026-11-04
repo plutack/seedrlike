@@ -47,7 +47,7 @@ templ Download() {
 						placeholder="Paste a magnet link or search…"
 						autocomplete="off"
 						hx-get="/search"
-						hx-trigger="keyup changed delay:500ms[this.value.trim().length >= 3]"
+						hx-trigger="input[!/^magnet:\?/.test(this.value.trim().toLowerCase()) && this.value.trim().length >= 3] changed delay:500ms"
 						hx-target="#download-response"
 						hx-swap="innerHTML"
 						hx-sync="this:replace"
@@ -82,7 +82,7 @@ templ Download() {
 						class="btn btn-primary px-6 whitespace-nowrap"
 						x-show="!isSearch"
 						x-bind:disabled="!isMagnet"
-					>Download all</button>
+					>Download magnet</button>
 					<button
 						type="button"
 						class="btn btn-outline whitespace-nowrap"

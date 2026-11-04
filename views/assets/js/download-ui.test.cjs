@@ -10,6 +10,15 @@ function fixture() {
  vm.runInNewContext(fs.readFileSync(__dirname+'/download-ui.js','utf8'),{document,window:{}});
  return {listeners,modal,xhr:{abort(){aborted=true}},get aborted(){return aborted}};
 }
+test('magnet paste blocks pending search and late search responses',()=>{
+ const listeners={};let value='magnet:?xt=urn:btih:test';
+ const document={addEventListener(n,f){(listeners[n] ||= []).push(f)},querySelector(){return {value}}};
+ vm.runInNewContext(fs.readFileSync(__dirname+'/download-ui.js','utf8'),{document,window:{},URL});
+ let cancelled=false;listeners['htmx:configRequest'][0]({detail:{path:'/search'},preventDefault(){cancelled=true}});assert.ok(cancelled);
+ const event={detail:{xhr:{responseURL:'https://ui.test/search?q=old'},target:{id:'download-response'},shouldSwap:true}};
+ for(const f of listeners['htmx:beforeSwap'])f(event);assert.equal(event.detail.shouldSwap,false);
+ value='ubuntu';cancelled=false;listeners['htmx:configRequest'][0]({detail:{path:'/search'},preventDefault(){cancelled=true}});assert.equal(cancelled,false);
+});
 function upload() {
  const window={};vm.runInNewContext(fs.readFileSync(__dirname+'/download-ui.js','utf8'),{window,document:{addEventListener(){}}});
  return Object.assign(window.torrentUpload(),{$refs:{file:{value:'',focus(){}}},$root:{querySelector(){return {replaceChildren(){}}}}});

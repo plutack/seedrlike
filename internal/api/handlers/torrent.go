@@ -71,10 +71,7 @@ func parseSelection(values []string) ([]int, error) {
 	return out, nil
 }
 func (d *DownloadHandler) CreateNewDownload(w http.ResponseWriter, r *http.Request) {
-	userID := requireDownloadUser(w, r)
-	if userID == "" {
-		return
-	}
+	userID, _ := r.Context().Value(UserIDKey).(string)
 	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", 400)
@@ -113,10 +110,7 @@ func (d *DownloadHandler) StopDownload(w http.ResponseWriter, r *http.Request) {
 // UploadTorrent accepts one bounded multipart file; filename and MIME type are
 // only UI hints. The bencoded content is validated again at the queue boundary.
 func (d *DownloadHandler) UploadTorrent(w http.ResponseWriter, r *http.Request) {
-	userID := requireDownloadUser(w, r)
-	if userID == "" {
-		return
-	}
+	userID, _ := r.Context().Value(UserIDKey).(string)
 	fail := func(message string) { components.DownloadFeedback(message, true).Render(r.Context(), w) }
 	r.Body = http.MaxBytesReader(w, r.Body, queue.MaxTorrentFileSize+(64<<10))
 	if err := r.ParseMultipartForm(queue.MaxTorrentFileSize + (64 << 10)); err != nil {
@@ -186,9 +180,6 @@ func (d *DownloadHandler) UploadTorrent(w http.ResponseWriter, r *http.Request) 
 }
 
 func (d *DownloadHandler) Preview(w http.ResponseWriter, r *http.Request) {
-	if requireDownloadUser(w, r) == "" {
-		return
-	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid magnet", 400)

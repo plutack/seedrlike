@@ -20,6 +20,7 @@ templ Download() {
 				hx-target="#download-response"
 				hx-swap="innerHTML"
 				hx-disabled-elt="find button[type=submit]"
+				x-on:submit="if (!isMagnet) $event.preventDefault()"
 			>
 				<label class="input input-bordered flex items-center gap-2 w-full sm:flex-1 min-w-0">
 					<img
@@ -47,7 +48,9 @@ templ Download() {
 						placeholder="Paste a magnet link or search…"
 						autocomplete="off"
 						hx-get="/search"
-						hx-trigger="input[!/^magnet:\?/.test(this.value.trim().toLowerCase()) && this.value.trim().length >= 3] changed delay:500ms"
+						hx-trigger="input changed delay:500ms, search-now"
+						x-on:keydown.enter="if (!isMagnet) { $event.preventDefault(); htmx.trigger($el, 'search-now'); }"
+						hx-disabled-elt="closest form"
 						hx-target="#download-response"
 						hx-swap="innerHTML"
 						hx-sync="this:replace"
@@ -94,8 +97,6 @@ templ Download() {
 					>Choose files</button>
 				</div>
 			</form>
-			@TorrentUpload()
-			@FilePickerDialog()
 			<!--
 				Filter bar + results live in one Alpine scope. Filters run
 				client-side over the rendered rows (data-* attributes) so
@@ -169,6 +170,8 @@ templ Download() {
 					class="mt-4 w-full min-w-0"
 				></div>
 			</div>
+			@TorrentUpload()
+			@FilePickerDialog()
 		</div>
 	</div>
 }

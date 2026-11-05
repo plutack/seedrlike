@@ -11,7 +11,9 @@ document.addEventListener('htmx:beforeSwap', event => {
     const responseURL = event.detail.xhr?.responseURL;
     if (!responseURL || new URL(responseURL).pathname !== '/search') return;
     const value = document.querySelector('input[name="magnet-link"]')?.value.trim() || '';
-    if (/^magnet:\?/i.test(value) || value.length < 3) event.detail.shouldSwap = false;
+    const url = new URL(responseURL);
+    const requested = (url.searchParams.get('q') || url.searchParams.get('magnet-link') || '').trim();
+    if (/^magnet:\?/i.test(value) || value.length < 3 || requested !== value) event.detail.shouldSwap = false;
 });
 
 // File selection is local until explicit submission; HTMX owns the upload.

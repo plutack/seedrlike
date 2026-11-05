@@ -97,8 +97,6 @@ templ Download() {
 					>Choose files</button>
 				</div>
 			</form>
-			@TorrentUpload()
-			@FilePickerDialog()
 			<!--
 				Filter bar + results live in one Alpine scope. Filters run
 				client-side over the rendered rows (data-* attributes) so
@@ -172,6 +170,8 @@ templ Download() {
 					class="mt-4 w-full min-w-0"
 				></div>
 			</div>
+			@TorrentUpload()
+			@FilePickerDialog()
 		</div>
 	</div>
 }

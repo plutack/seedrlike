@@ -13,6 +13,9 @@ func TestTorrentUploadReplacesBatchImportAndRetainsModalPreview(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := out.String()
+	if strings.Index(html, `id="download-response"`) > strings.Index(html, `aria-labelledby="torrent-upload-title"`) {
+		t.Error("search results must appear before the torrent upload panel")
+	}
 	for _, want := range []string{`name="torrent-file"`, `type="file"`, `hx-post="/downloads/torrent"`, `hx-encoding="multipart/form-data"`, `torrent-uploaded.window`, "Add to queue", `hx-trigger="input changed delay:500ms, search-now"`, `x-on:keydown.enter`, `hx-disabled-elt="closest form"`, `x-data="torrentUpload()"`, `x-on:drop.prevent`, `aria-label="Torrent file upload progress"`, `id="torrent-file-error"`, `x-bind:aria-busy="busy"`, `hx-target="#file-picker-content"`, `id="file-picker"`, `aria-labelledby="file-picker-title"`, `id="file-picker-loading"`, `loading-spinner`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing batch/modal behavior %s", want)

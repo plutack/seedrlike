@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+// GetFileByID resolves a completed library file; callers enforce visibility.
+func (q *Queries) GetFileByID(ctx context.Context, id string) (File, error) {
+	var file File
+	err := q.db.QueryRowContext(ctx, `SELECT id, name, folder_id, size, mimetype, md5, server, date_added, user_id FROM Files WHERE ID = ?`, id).Scan(
+		&file.ID, &file.Name, &file.FolderID, &file.Size, &file.Mimetype,
+		&file.Md5, &file.Server, &file.DateAdded, &file.UserID,
+	)
+	return file, err
+}
+
 type LibraryParams struct {
 	ParentFolderID string
 	FolderID       string

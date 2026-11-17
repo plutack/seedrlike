@@ -21,6 +21,7 @@ templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderI
 			<script defer src="/assets/js/htmx.min.js" hx-preserve="true"></script>
 			<script defer src="/assets/js/htmx.ext.ws.js" hx-preserve="true"></script>
 			<script defer src="/assets/js/download-ui.js?v=5" hx-preserve="true"></script>
+			<script defer src="/assets/js/media-player.js?v=1" hx-preserve="true"></script>
 			<script defer src="/assets/js/alpine.min.js" hx-preserve="true"></script>
 			<link href="/assets/css/tailwind.css" rel="stylesheet" hx-preserve="true"/>
 			<style hx-preserve="true">[x-cloak]{display:none !important}</style>
@@ -47,6 +48,7 @@ templ Base(returnErr bool, torrents []database.GetFolderContentsRow, rootFolderI
 					@components.DownloadList(returnErr, torrents, rootFolderID, isLoggedIn)
 				</div>
 			</main>
+			@components.MediaPlayer()
 			@components.Footer()
 		</body>
 	</html>

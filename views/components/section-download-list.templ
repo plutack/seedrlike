@@ -1,7 +1,18 @@
 package components
 
 import "fmt"
+import "net/url"
+import "github.com/plutack/seedrlike/internal/media"
 import database "github.com/plutack/seedrlike/internal/database/sqlc"
+
+func playableFile(item database.GetFolderContentsRow) bool {
+	_, ok := media.Detect(item.Name)
+	return item.Type == "file" && ok
+}
+
+func mediaMetadataURL(id string) string {
+	return "/media/" + url.PathEscape(id)
+}
 
 func formatSize(size int64) string {
 	sizeInMB := float64(size) / 1000000
@@ -9,7 +20,7 @@ func formatSize(size int64) string {
 }
 
 func returnFileDownloadUrl(server string, contentID string, name string) string {
-	return fmt.Sprintf("https://%s.gofile.io/download/web/%s/%s", server, contentID, name)
+	return fmt.Sprintf("https://%s.gofile.io/download/web/%s/%s", server, url.PathEscape(contentID), url.PathEscape(name))
 }
 
 func returnFolderDownloadUrl(contentID string) string {
@@ -177,7 +188,7 @@ templ DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConte
 						<span class="w-5"></span>
 						<span>Name</span>
 						<span class="text-right pr-2">Size (MB)</span>
-						<span class="text-center w-20">Actions</span>
+						<span class="text-center">Actions</span>
 					</div>
 					<!-- Rows -->
 					<div class="divide-y divide-base-200">
@@ -221,6 +232,9 @@ templ DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConte
 								}
 								<span class="col-start-2 row-start-2 sm:col-start-4 sm:row-start-1 text-xs text-base-content/60 sm:text-sm sm:text-base-content/70 sm:text-right tabular-nums sm:pr-2 whitespace-nowrap">{ formatSize(torrent.Size) }<span class="sm:hidden"> MB</span></span>
 								<div class="col-start-3 row-start-1 row-span-2 sm:col-start-5 sm:row-span-1 flex items-center justify-end gap-2 sm:gap-1">
+									if playableFile(torrent) {
+										<button type="button" class="btn btn-outline btn-sm sm:btn-xs" data-media-url={ mediaMetadataURL(torrent.ID) } aria-label={ "Play " + torrent.Name }>Play</button>
+									}
 									<a
 										if torrent.Type == "folder" {
 											href={ templ.SafeURL(returnFolderDownloadUrl(torrent.ID)) }

@@ -9,18 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import "fmt"
-import "net/url"
-import "github.com/plutack/seedrlike/internal/media"
 import database "github.com/plutack/seedrlike/internal/database/sqlc"
-
-func playableFile(item database.GetFolderContentsRow) bool {
-	_, ok := media.Detect(item.Name)
-	return item.Type == "file" && ok
-}
-
-func mediaMetadataURL(id string) string {
-	return "/media/" + url.PathEscape(id)
-}
 
 func formatSize(size int64) string {
 	sizeInMB := float64(size) / 1000000
@@ -28,7 +17,7 @@ func formatSize(size int64) string {
 }
 
 func returnFileDownloadUrl(server string, contentID string, name string) string {
-	return fmt.Sprintf("https://%s.gofile.io/download/web/%s/%s", server, url.PathEscape(contentID), url.PathEscape(name))
+	return fmt.Sprintf("https://%s.gofile.io/download/web/%s/%s", server, contentID, name)
 }
 
 func returnFolderDownloadUrl(contentID string) string {
@@ -96,7 +85,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(options.FolderURL(folderID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 43, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 32, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -109,7 +98,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(options.FolderURL(folderID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 65, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 54, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -127,7 +116,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(options.StaleDeleteURL(folderID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 76, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 65, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -154,7 +143,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("/contents/" + folderID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 85, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 74, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -167,7 +156,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(options.Query)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 88, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 77, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -180,7 +169,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(options.Sort == "name")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 93, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 82, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -193,7 +182,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(options.Sort == "size")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 94, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 83, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -206,7 +195,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(options.Sort == "date")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 95, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 84, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -219,7 +208,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(options.Order == "asc")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 101, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 90, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -232,7 +221,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(options.Order == "desc")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 102, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 91, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -250,7 +239,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(options.Query)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 109, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 98, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -263,7 +252,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(len(torrents)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 109, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 98, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -285,7 +274,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(options.ClearURL(folderID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 110, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 99, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -322,7 +311,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div x-data=\"{\n\t\t\t\t\t\tcount: 0,\n\t\t\t\t\t\tdeleting: false,\n\t\t\t\t\t\tdeleteError: &#39;&#39;,\n\t\t\t\t\t\tsync() { this.count = this.$root.querySelectorAll(&#39;.row-check:checked&#39;).length; },\n\t\t\t\t\t\ttoggleAll(e) {\n\t\t\t\t\t\t\tthis.$root.querySelectorAll(&#39;.row-check&#39;).forEach(c =&gt; c.checked = e.target.checked);\n\t\t\t\t\t\t\tthis.sync();\n\t\t\t\t\t\t},\n\t\t\t\t\t\tasync deleteSelected() {\n\t\t\t\t\t\t\tif (this.deleting) return;\n\t\t\t\t\t\t\tconst checked = [...this.$root.querySelectorAll(&#39;.row-check:checked&#39;)];\n\t\t\t\t\t\t\tif (!checked.length) { this.$refs.deleteDialog.close(); return; }\n\t\t\t\t\t\t\tthis.deleting = true;\n\t\t\t\t\t\t\tthis.deleteError = &#39;&#39;;\n\t\t\t\t\t\t\tlet failed = 0;\n\t\t\t\t\t\t\tfor (const c of checked) {\n\t\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\t\tconst response = await fetch(&#39;/contents/&#39; + encodeURIComponent(c.dataset.id) + &#39;?type=&#39; + encodeURIComponent(c.dataset.type), { method: &#39;DELETE&#39; });\n\t\t\t\t\t\t\t\t\tif (response.ok) { c.checked = false; c.disabled = true; } else { failed++; }\n\t\t\t\t\t\t\t\t} catch (_) { failed++; }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tthis.deleting = false;\n\t\t\t\t\t\t\tthis.sync();\n\t\t\t\t\t\t\tif (failed) {\n\t\t\t\t\t\t\t\tthis.deleteError = failed + &#39; item(s) could not be deleted. They may no longer be available, or you may not have permission. Please try again.&#39;;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tthis.$refs.deleteDialog.close();\n\t\t\t\t\t\t\t\thtmx.trigger(&#39;#content-list&#39;, &#39;refresh&#39;);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\" class=\"rounded-box border border-base-300 bg-base-100 overflow-hidden shadow-sm\"><!-- Selection action bar --><div x-show=\"count &gt; 0\" x-cloak class=\"flex items-center justify-between gap-3 px-4 py-2 bg-primary/10 border-b border-base-300 text-sm\"><span x-text=\"count + &#39; selected&#39;\" class=\"font-medium\"></span> <button type=\"button\" class=\"btn btn-error btn-xs\" x-on:click=\"deleteError = &#39;&#39;; $refs.deleteDialog.showModal()\">Delete selected</button></div><dialog x-ref=\"deleteDialog\" class=\"modal modal-bottom sm:modal-middle\" aria-labelledby=\"delete-selected-title\" x-on:cancel=\"if (deleting) $event.preventDefault()\"><div class=\"modal-box\"><h3 id=\"delete-selected-title\" class=\"font-semibold text-lg\">Delete selected items?</h3><p class=\"py-3 text-sm text-base-content/80\">This permanently removes <span class=\"font-medium\" x-text=\"count\"></span> selected item(s) and their contents. This cannot be undone.</p><p role=\"alert\" class=\"text-error text-sm\" x-show=\"deleteError\" x-text=\"deleteError\" x-cloak></p><div class=\"modal-action\"><button type=\"button\" class=\"btn btn-ghost btn-sm\" x-bind:disabled=\"deleting\" x-on:click=\"$refs.deleteDialog.close(); htmx.trigger(&#39;#content-list&#39;, &#39;refresh&#39;)\" autofocus>Cancel</button> <button type=\"button\" class=\"btn btn-error btn-sm\" x-bind:disabled=\"deleting || count === 0\" x-on:click=\"deleteSelected()\" x-text=\"deleting ? &#39;Deleting...&#39; : &#39;Delete items&#39;\">Delete items</button></div></div></dialog><!-- Column header --><div class=\"hidden sm:grid sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 px-4 py-2.5 border-b border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wide text-base-content/60\"><input type=\"checkbox\" class=\"checkbox checkbox-sm\" aria-label=\"Select all\" x-on:change=\"toggleAll($event)\"> <span class=\"w-5\"></span> <span>Name</span> <span class=\"text-right pr-2\">Size (MB)</span> <span class=\"text-center\">Actions</span></div><!-- Rows --><div class=\"divide-y divide-base-200\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div x-data=\"{\n\t\t\t\t\t\tcount: 0,\n\t\t\t\t\t\tdeleting: false,\n\t\t\t\t\t\tdeleteError: &#39;&#39;,\n\t\t\t\t\t\tsync() { this.count = this.$root.querySelectorAll(&#39;.row-check:checked&#39;).length; },\n\t\t\t\t\t\ttoggleAll(e) {\n\t\t\t\t\t\t\tthis.$root.querySelectorAll(&#39;.row-check&#39;).forEach(c =&gt; c.checked = e.target.checked);\n\t\t\t\t\t\t\tthis.sync();\n\t\t\t\t\t\t},\n\t\t\t\t\t\tasync deleteSelected() {\n\t\t\t\t\t\t\tif (this.deleting) return;\n\t\t\t\t\t\t\tconst checked = [...this.$root.querySelectorAll(&#39;.row-check:checked&#39;)];\n\t\t\t\t\t\t\tif (!checked.length) { this.$refs.deleteDialog.close(); return; }\n\t\t\t\t\t\t\tthis.deleting = true;\n\t\t\t\t\t\t\tthis.deleteError = &#39;&#39;;\n\t\t\t\t\t\t\tlet failed = 0;\n\t\t\t\t\t\t\tfor (const c of checked) {\n\t\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\t\tconst response = await fetch(&#39;/contents/&#39; + encodeURIComponent(c.dataset.id) + &#39;?type=&#39; + encodeURIComponent(c.dataset.type), { method: &#39;DELETE&#39; });\n\t\t\t\t\t\t\t\t\tif (response.ok) { c.checked = false; c.disabled = true; } else { failed++; }\n\t\t\t\t\t\t\t\t} catch (_) { failed++; }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tthis.deleting = false;\n\t\t\t\t\t\t\tthis.sync();\n\t\t\t\t\t\t\tif (failed) {\n\t\t\t\t\t\t\t\tthis.deleteError = failed + &#39; item(s) could not be deleted. They may no longer be available, or you may not have permission. Please try again.&#39;;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tthis.$refs.deleteDialog.close();\n\t\t\t\t\t\t\t\thtmx.trigger(&#39;#content-list&#39;, &#39;refresh&#39;);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\" class=\"rounded-box border border-base-300 bg-base-100 overflow-hidden shadow-sm\"><!-- Selection action bar --><div x-show=\"count &gt; 0\" x-cloak class=\"flex items-center justify-between gap-3 px-4 py-2 bg-primary/10 border-b border-base-300 text-sm\"><span x-text=\"count + &#39; selected&#39;\" class=\"font-medium\"></span> <button type=\"button\" class=\"btn btn-error btn-xs\" x-on:click=\"deleteError = &#39;&#39;; $refs.deleteDialog.showModal()\">Delete selected</button></div><dialog x-ref=\"deleteDialog\" class=\"modal modal-bottom sm:modal-middle\" aria-labelledby=\"delete-selected-title\" x-on:cancel=\"if (deleting) $event.preventDefault()\"><div class=\"modal-box\"><h3 id=\"delete-selected-title\" class=\"font-semibold text-lg\">Delete selected items?</h3><p class=\"py-3 text-sm text-base-content/80\">This permanently removes <span class=\"font-medium\" x-text=\"count\"></span> selected item(s) and their contents. This cannot be undone.</p><p role=\"alert\" class=\"text-error text-sm\" x-show=\"deleteError\" x-text=\"deleteError\" x-cloak></p><div class=\"modal-action\"><button type=\"button\" class=\"btn btn-ghost btn-sm\" x-bind:disabled=\"deleting\" x-on:click=\"$refs.deleteDialog.close(); htmx.trigger(&#39;#content-list&#39;, &#39;refresh&#39;)\" autofocus>Cancel</button> <button type=\"button\" class=\"btn btn-error btn-sm\" x-bind:disabled=\"deleting || count === 0\" x-on:click=\"deleteSelected()\" x-text=\"deleting ? &#39;Deleting...&#39; : &#39;Delete items&#39;\">Delete items</button></div></div></dialog><!-- Column header --><div class=\"hidden sm:grid sm:grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 px-4 py-2.5 border-b border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wide text-base-content/60\"><input type=\"checkbox\" class=\"checkbox checkbox-sm\" aria-label=\"Select all\" x-on:change=\"toggleAll($event)\"> <span class=\"w-5\"></span> <span>Name</span> <span class=\"text-right pr-2\">Size (MB)</span> <span class=\"text-center w-20\">Actions</span></div><!-- Rows --><div class=\"divide-y divide-base-200\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -334,7 +323,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(torrent.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 200, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 189, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -347,7 +336,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(torrent.Type)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 201, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 190, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -385,7 +374,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 					var templ_7745c5c3_Var21 string
 					templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(options.ClearURL(torrent.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 213, Col: 47}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 202, Col: 47}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 					if templ_7745c5c3_Err != nil {
@@ -398,7 +387,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 					var templ_7745c5c3_Var22 string
 					templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(torrent.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 218, Col: 30}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 207, Col: 30}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 					if templ_7745c5c3_Err != nil {
@@ -411,7 +400,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 					var templ_7745c5c3_Var23 string
 					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(torrent.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 220, Col: 24}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 209, Col: 24}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 					if templ_7745c5c3_Err != nil {
@@ -438,7 +427,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 					var templ_7745c5c3_Var25 string
 					templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(torrent.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 228, Col: 30}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 217, Col: 30}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 					if templ_7745c5c3_Err != nil {
@@ -451,7 +440,7 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 					var templ_7745c5c3_Var26 string
 					templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(torrent.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 230, Col: 24}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 219, Col: 24}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 					if templ_7745c5c3_Err != nil {
@@ -469,118 +458,82 @@ func DownloadListWithOptions(returnErr bool, torrents []database.GetFolderConten
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(formatSize(torrent.Size))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 233, Col: 219}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 222, Col: 219}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"sm:hidden\">MB</span></span><div class=\"col-start-3 row-start-1 row-span-2 sm:col-start-5 sm:row-span-1 flex items-center justify-end gap-2 sm:gap-1\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if playableFile(torrent) {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<button type=\"button\" class=\"btn btn-outline btn-sm sm:btn-xs\" data-media-url=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var28 string
-					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(mediaMetadataURL(torrent.ID))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 236, Col: 118}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\" aria-label=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var29 string
-					templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs("Play " + torrent.Name)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 236, Col: 156}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\">Play</button> ")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<a")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"sm:hidden\">MB</span></span><div class=\"col-start-3 row-start-1 row-span-2 sm:col-start-5 sm:row-span-1 flex items-center justify-end gap-2 sm:gap-1\"><a")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if torrent.Type == "folder" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, " href=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, " href=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var30 templ.SafeURL = templ.SafeURL(returnFolderDownloadUrl(torrent.ID))
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var30)))
+					var templ_7745c5c3_Var28 templ.SafeURL = templ.SafeURL(returnFolderDownloadUrl(torrent.ID))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var28)))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, " href=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, " href=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var31 templ.SafeURL = templ.SafeURL(returnFileDownloadUrl(torrent.Server, torrent.ID, torrent.Name))
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var31)))
+					var templ_7745c5c3_Var29 templ.SafeURL = templ.SafeURL(returnFileDownloadUrl(torrent.Server, torrent.ID, torrent.Name))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var29)))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, " target=\"_blank\" class=\"btn btn-ghost btn-sm sm:btn-xs btn-square\" title=\"Download\" aria-label=\"Download\"><svg class=\"w-5 h-5 sm:w-4 sm:h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 3v12m0 0l-4-4m4 4l4-4M4 19h16\"></path></svg></a> <button disabled=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, " target=\"_blank\" class=\"btn btn-ghost btn-sm sm:btn-xs btn-square\" title=\"Download\" aria-label=\"Download\"><svg class=\"w-5 h-5 sm:w-4 sm:h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 3v12m0 0l-4-4m4 4l4-4M4 19h16\"></path></svg></a> <button disabled=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var32 string
-				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(!isLoggedIn)
+				var templ_7745c5c3_Var30 string
+				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(!isLoggedIn)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 254, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 240, Col: 32}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" hx-delete=\"")
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var33 string
-				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(options.DeleteURL(torrent.ID, torrent.Type, folderID))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 255, Col: 75}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "\" hx-delete=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-on::htmx:afterRequest=\"htmx.trigger(&#39;#content-list&#39;, &#39;refresh&#39;)\" class=\"btn btn-ghost btn-sm sm:btn-xs btn-square text-error hover:bg-error/10\" title=\"Delete\" aria-label=\"Delete\"><svg class=\"w-5 h-5 sm:w-4 sm:h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 0v12a1 1 0 001 1h6a1 1 0 001-1V7\"></path></svg></button></div></div>")
+				var templ_7745c5c3_Var31 string
+				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(options.DeleteURL(torrent.ID, torrent.Type, folderID))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/components/section-download-list.templ`, Line: 241, Col: 75}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\" hx-target=\"#content-list\" hx-swap=\"outerHTML\" hx-on::htmx:afterRequest=\"htmx.trigger(&#39;#content-list&#39;, &#39;refresh&#39;)\" class=\"btn btn-ghost btn-sm sm:btn-xs btn-square text-error hover:bg-error/10\" title=\"Delete\" aria-label=\"Delete\"><svg class=\"w-5 h-5 sm:w-4 sm:h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 0v12a1 1 0 001 1h6a1 1 0 001-1V7\"></path></svg></button></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

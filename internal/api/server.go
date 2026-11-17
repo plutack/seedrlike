@@ -75,9 +75,6 @@ func (s *Server) registerRoutes() {
 
 	d := handlers.NewDownloadHandler(s.queue)
 	d.SetPreviewClient(s.previewClient)
-	media := handlers.NewMediaHandler(s.dbQueries)
-	apiRouter.HandleFunc("/media/{ID}", media.Metadata).Methods(GetMethod)
-	apiRouter.HandleFunc("/media/{ID}/stream", media.Stream).Methods(GetMethod, http.MethodHead)
 	settings := handlers.NewSettingsHandler(s.db)
 	admin := handlers.NewAdminHandler(s.dbQueries, s.queue, s.jobStore, s.dataDir)
 	apiRouter.HandleFunc("/settings", settings.Settings).Methods(GetMethod)
